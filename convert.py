@@ -29,10 +29,13 @@ from pymediainfo import MediaInfo
 class Converter:
 
     def __init__(self):
-
-        self.cache = diskcache.Cache('diskcache')
-
         self.ffmpeg_file = Path(r'C:\ProgramData\chocolatey\lib\ffmpeg-full\tools\ffmpeg\bin\ffmpeg.exe')
+
+        self.script_dir = Path(__file__).parent
+
+        self.tmp_dir = self.script_dir / 'tmp'
+
+        self.cache = diskcache.Cache((self.tmp_dir / 'converter_cache').as_posix())
 
     class TuneH264(enum.Enum):
         film = 0
@@ -151,7 +154,7 @@ class Converter:
 
         out_file = rf'C:\Users\T\Videos\{file.stem}__{crf}_{width}_{height}-{tune.name}.mp4'
         out_file = Path(out_file)
-        out_file_local = Path('converted').with_suffix(out_file.suffix)
+        out_file_local = Path(self.tmp_dir / 'converted').with_suffix(out_file.suffix)
 
         if fps is None:
             video_info = self.get_video_media_info(file)
@@ -231,88 +234,95 @@ class Converter:
             raise ValueError()
 
         if first_frame_image:
+            current_dir = os.getcwd()
 
-            video_info = self.get_video_media_info(out_file_local)
+            os.chdir(self.tmp_dir)
 
-            tmp_mp4 = Path('tmp_preview_video.mp4')
+            try:
+                video_info = self.get_video_media_info(out_file_local)
 
-            out_file_with_preview = out_file_local.with_name('video_with_preview.mp4')
+                tmp_mp4 = Path('tmp_preview_video.mp4')
 
-            input1 = Path('input1.ts')
-            input2 = Path('input2.ts')
+                out_file_with_preview = out_file_local.with_name('video_with_preview.mp4')
 
-            params = []
+                input1 = Path('input1.ts')
+                input2 = Path('input2.ts')
 
-            params += [self.ffmpeg_file.as_posix() + ' ']
-            params += ['-i', first_frame_image]
-            params += ['-y']
-            params += ['-c:v', 'libx264']
-            params += ['-pix_fmt', f'yuv420p']
-            params += ['-s', f'{video_info.width}x{video_info.height}']
-            params += ['-t', '0.02']
-            params += ['-r', video_info.frame_rate]
+                params = []
 
-            params += [tmp_mp4]
+                params += [self.ffmpeg_file.as_posix() + ' ']
+                params += ['-i', first_frame_image]
+                params += ['-y']
+                params += ['-c:v', 'libx264']
+                params += ['-pix_fmt', f'yuv420p']
+                params += ['-s', f'{video_info.width}x{video_info.height}']
+                params += ['-t', '0.02']
+                params += ['-r', video_info.frame_rate]
 
-            print(params)
+                params += [tmp_mp4]
 
-            if not self.exec_ffmpeg(params):
-                sound_error()
+                print(params)
 
-                raise ValueError()
+                if not self.exec_ffmpeg(params):
+                    sound_error()
 
-            params = []
+                    raise ValueError()
 
-            params += [self.ffmpeg_file.as_posix() + ' ']
-            params += ['-i', tmp_mp4.name]
-            params += ['-y']
-            params += ['-c', 'copy']
-            params += [input1]
+                params = []
 
-            print(params)
+                params += [self.ffmpeg_file.as_posix() + ' ']
+                params += ['-i', tmp_mp4.name]
+                params += ['-y']
+                params += ['-c', 'copy']
+                params += [input1]
 
-            if not self.exec_ffmpeg(params):
-                sound_error()
+                print(params)
 
-                raise ValueError()
+                if not self.exec_ffmpeg(params):
+                    sound_error()
 
-            params = []
+                    raise ValueError()
 
-            params += [self.ffmpeg_file.as_posix() + ' ']
-            params += ['-i', out_file_local.name]
-            params += ['-y']
-            params += ['-c', 'copy']
+                params = []
 
-            params += [input2]
+                params += [self.ffmpeg_file.as_posix() + ' ']
+                params += ['-i', out_file_local.name]
+                params += ['-y']
+                params += ['-c', 'copy']
 
-            print(params)
+                params += [input2]
 
-            if not self.exec_ffmpeg(params):
-                sound_error()
+                print(params)
 
-                raise ValueError()
+                if not self.exec_ffmpeg(params):
+                    sound_error()
 
-            params = []
+                    raise ValueError()
 
-            params += [self.ffmpeg_file.as_posix() + ' ']
-            params += ['-i', f'concat:{input1.name}|{input2.name}']
-            params += ['-y']
-            params += ['-c', 'copy']
+                params = []
 
-            params += [out_file_with_preview]
+                params += [self.ffmpeg_file.as_posix() + ' ']
+                params += ['-i', f'concat:{input1.name}|{input2.name}']
+                params += ['-y']
+                params += ['-c', 'copy']
 
-            print(params)
+                params += [out_file_with_preview]
 
-            if not self.exec_ffmpeg(params):
-                sound_error()
+                print(params)
 
-                raise ValueError()
+                if not self.exec_ffmpeg(params):
+                    sound_error()
 
-            tmp_mp4.unlink()
-            input1.unlink()
-            input2.unlink()
+                    raise ValueError()
 
-            shutil.move(out_file_with_preview, out_file)
+                tmp_mp4.unlink()
+                input1.unlink()
+                input2.unlink()
+
+                shutil.move(out_file_with_preview, out_file)
+
+            finally:
+                os.chdir(current_dir)
 
         out_file_local.unlink()
 
@@ -397,8 +407,6 @@ class Converter:
             self,
             file: Path = None,
             quality_vbr: int = 1,
-            # audio_bitrate_kilobit: int = 192,
-
             start_time: str = '00:00:00',
             end_time: str = None
     ):
@@ -417,6 +425,7 @@ class Converter:
         params += [self.ffmpeg_file.as_posix() + ' ']
         params += ['-i', file]
         params += ['-y']
+        params += ['-vn']
 
         if start_time:
             params += ['-ss', start_time]
@@ -426,9 +435,64 @@ class Converter:
 
         params += ['-codec:a', 'libmp3lame']
 
-        params += ['-q:a', f'{quality_vbr}']
+        # params += ['-b:a', f'{audio_bitrate_kilobit}']
+        params += ['-qscale:a', f'{quality_vbr}']
+
+        params += ['-compression_level', '0']
+
+        params += ['-cutoff', '22000']
 
         params += ['-joint_stereo', '0']
+
+        params += [out_file]
+
+        print(params)
+
+        if not self.exec_ffmpeg(params):
+            sound_error()
+
+            raise ValueError()
+
+        print(f'Ok время {time.monotonic() - start}')
+
+        return self.ConvertResult(in_file=file, out_file=out_file)
+
+    @validate_arguments()
+    def aac(
+            self,
+            file: Path = None,
+            audio_bitrate_kilobit: int = 196,
+            start_time: str = '00:00:00',
+            end_time: str = None
+    ):
+        if not file:
+            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = Path(file)
+
+        start = time.monotonic()
+
+        out_file = rf'C:\Users\T\Videos\{file.stem}__{audio_bitrate_kilobit}.aac'
+
+        out_file = Path(out_file)
+
+        params = []
+
+        params += [self.ffmpeg_file.as_posix() + ' ']
+        params += ['-i', file]
+        params += ['-y']
+        params += ['-vn']
+
+        if start_time:
+            params += ['-ss', start_time]
+
+        if end_time:
+            params += ['-to', end_time]
+
+        params += ['-c:a', 'aac']
+        params += ['-b:a', f'{audio_bitrate_kilobit}k']
+
+        params += ['-cutoff', '22000']
+        params += ['-aac_coder', 'fast']
 
         params += [out_file]
 
@@ -736,7 +800,7 @@ class Converter:
 
         out_file = Path(out_file)
 
-        out_file_local = Path('converted').with_suffix(out_file.suffix)
+        out_file_local = Path(self.tmp_dir / 'converted').with_suffix(out_file.suffix)
 
         params = []
 
@@ -858,7 +922,11 @@ class Youtube:
 
         self.root.title = 'Выбор'
 
-        self.cache = diskcache.Cache('diskcache')
+        self.script_dir = Path(__file__).parent
+
+        self.tmp_dir = self.script_dir / 'tmp'
+
+        self.cache = diskcache.Cache((self.tmp_dir / 'youtube_cache').as_posix())
 
         # label = ttk.Label(text=self.root.clipboard_get())
         # label.pack(fill='x', padx=5, pady=pady)
@@ -968,7 +1036,7 @@ class Youtube:
 
         button = ttk.Button(
             self.root,
-            text="Конвертация Vorbis",
+            text="Конвертация MP3",
             command=lambda: self.convert_to_vorbis()
         )
 
@@ -1273,7 +1341,9 @@ class Youtube:
     def convert_to_mp3(self):
         self.status = 'Статус'
 
-        res = self.converter_obj.mp3(quality_vbr=0, start_time='00:00:00')
+        file = self.open_file_with_cache(start_dir='c:/ProjectsMy/youtube/download', cache_key='convert_to_mp3')
+
+        res = self.converter_obj.mp3(file=file, start_time='00:00:00')
 
         self.converter_obj.extract_screenshot_from_video(
             file=res.in_file,
@@ -1288,7 +1358,9 @@ class Youtube:
     def convert_to_vorbis(self):
         self.status = 'Статус'
 
-        res = self.converter_obj.vorbis(quality_vbr=7, start_time='00:00:00')
+        file = self.open_file_with_cache(start_dir='c:/ProjectsMy/youtube/download', cache_key='convert_to_vorbis')
+
+        res = self.converter_obj.vorbis(file=file, quality_vbr=7, start_time='00:00:00')
 
         self.converter_obj.extract_screenshot_from_video(
             file=res.in_file,
@@ -1314,6 +1386,23 @@ class Youtube:
         self.status = 'Ок'
 
         sound_ok()
+
+    def convert_to_aac(self):
+        self.status = 'Статус'
+
+        file = self.open_file_with_cache(start_dir='c:/ProjectsMy/youtube/download', cache_key='convert_to_mp3')
+
+        res = self.converter_obj.aac(file=file, start_time='00:00:00')
+
+        self.converter_obj.extract_screenshot_from_video(
+            file=res.in_file,
+            out_file_image=Path(r'C:\Users\T\Videos\screenshot.png'),
+            start_time='00:00:03'
+        )
+
+        sound_ok()
+
+        self.status = 'Ок'
 
     def open_file_with_cache(self, start_dir: Union[Path, str], cache_key: str):
 
