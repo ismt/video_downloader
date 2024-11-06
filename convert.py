@@ -29,7 +29,7 @@ from pymediainfo import MediaInfo
 class Converter:
 
     def __init__(self):
-        self.ffmpeg_file = Path(r'C:\ProgramData\chocolatey\lib\ffmpeg-full\tools\ffmpeg\bin\ffmpeg.exe')
+        self.ffmpeg_file = Path(r'C:\ProgramData\chocolatey\bin\ffmpeg.exe')
 
         self.script_dir = Path(__file__).parent
 
@@ -65,7 +65,18 @@ class Converter:
     @staticmethod
     @validate_arguments()
     def exec_ffmpeg(args: list):
-        proc = subprocess.Popen(args, stdout=subprocess.PIPE, shell=False)
+        args2 = []
+
+        for i in args:
+            if type(i) is str:
+                args2.append(str(i))
+
+            else:
+                args2.append(f'"{i}"')
+
+        cmd = ' '.join(args2)
+
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=False)
 
         (out, err) = proc.communicate()
 
@@ -123,7 +134,7 @@ class Converter:
 
         self.exec_ffmpeg(params)
 
-    @validate_arguments()
+    # @validate_arguments()
     def h264(
             self,
             file: Path = None,
@@ -139,7 +150,8 @@ class Converter:
             tune: TuneH264 = TuneH264.film,
             audio_bitrate_kilobit: int = 192,
             fps: int = None,
-            first_frame_image: Union[Path, str] = None
+            first_frame_image: Union[Path, str] = None,
+            hardware_encode: bool = False,
     ):
 
         # https://trac.ffmpeg.org/wiki/Encode/H.264
@@ -152,7 +164,7 @@ class Converter:
 
         start = time.monotonic()
 
-        out_file = rf'C:\Users\T\Videos\{file.stem}__{crf}_{width}_{height}-{tune.name}.mp4'
+        out_file = rf'C:\Users\T\Videos\{file.stem}__{crf}_{width}_{height}-{tune.name}_{hardware_encode}.mp4'
         out_file = Path(out_file)
         out_file_local = Path(self.tmp_dir / 'converted').with_suffix(out_file.suffix)
 
@@ -179,6 +191,10 @@ class Converter:
         if copy_video:
             params += ['-c:v', 'copy']
 
+        elif hardware_encode:
+            # params += ['-c:v', 'h264_amf']
+            params += ['-c:v', 'av1_amf']
+
         else:
             params += ['-c:v', 'libx264']
 
@@ -190,10 +206,12 @@ class Converter:
         fastdecode- позволяет быстрее декодировать, отключив определенные фильтры
         zerolatency– подходит для быстрого кодирования и потоковой передачи с малой задержкой
         """
-        params += ['-tune', tune.name]
+        if not hardware_encode:
+            params += ['-tune', tune.name]
+            params += ['-crf', str(crf)]
+            params += ['-x264opts', 'opencl']
+            params += ['-preset', preset.name]
 
-        params += ['-crf', str(crf)]
-        params += ['-preset', preset.name]
         #
         # fps_str = ''
         #
@@ -213,12 +231,12 @@ class Converter:
             params += ['-c:a', 'aac']
             params += ['-b:a', f'{audio_bitrate_kilobit}k']
 
-            params += ['-cutoff', '22000']
+            params += ['-cutoff', '50000']
             params += ['-aac_coder', 'fast']
 
-        params += ['-x264opts', 'opencl']
         params += ['-g', f'{fps * 2}']
-        params += ['-level', '3.0']
+        # Для 2.2 разрешение не больше 720
+        params += ['-level', '2.2']
 
         # params += ['-filter:v', f'crop=in_w-800:in_h']
 
@@ -782,10 +800,7 @@ class Converter:
             end_time: str or None = None,
             length_time: str or None = None,  # '00:00:00'
             preset: PresetH264 = PresetH264.medium,
-            copy_audio: bool = False,
-            copy_video: bool = False,
             tune: TuneH264 = TuneH264.film,
-            fps: int = None,
     ):
 
         # https://trac.ffmpeg.org/wiki/Encode/H.264
@@ -829,9 +844,9 @@ class Converter:
 
         elif height:
             params += ['-vf', f'scale={-1}:{height}:flags=lanczos']
-
-        if fps:
-            params += ['-filter:v', f'fps={fps}']
+        #
+        # if fps:
+        #     params += ['-filter:v', f'fps={fps}']
 
         info = self.get_video_media_info(out_file)
 
@@ -905,8 +920,8 @@ class Converter:
 
 class Youtube:
     def __init__(self):
-        self.file_name_format = '../download/%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s.%(ext)s'
-        self.file_name_format_audio = '../download/%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s audio.%(ext)s'
+        self.file_name_format = '"../download/%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s.%(ext)s"'
+        self.file_name_format_audio = '"../download/%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s audio.%(ext)s"'
 
         self.yt_dlp_file = Path('./yt-dlp.exe')
 
@@ -1036,7 +1051,7 @@ class Youtube:
 
         button = ttk.Button(
             self.root,
-            text="Конвертация MP3",
+            text="Конвертация Vorbis",
             command=lambda: self.convert_to_vorbis()
         )
 
@@ -1067,11 +1082,10 @@ class Youtube:
 
     @validate_arguments()
     def download_archive(self, height: int = 720, convert_to_mp4: bool = False):
-        self.status = 'Старт'
-
-        # self.update_yt_dlp()
 
         url = self.tkinter_root.clipboard_get()
+
+        self.status = f'Старт скачивания {url}'
 
         if not isinstance(url, str) or not re.match(r'^http', url):
             self.sound_error()
@@ -1179,9 +1193,9 @@ class Youtube:
     @validate_arguments()
     def download_any(self, height: Union[int, str] = None):
 
-        self.status = 'Старт'
-
         url = self.tkinter_root.clipboard_get()
+
+        self.status = f'Старт скачивания {url}'
 
         if not isinstance(url, str) or not re.match(r'^http', url):
             self.sound_error()
@@ -1262,7 +1276,7 @@ class Youtube:
 
         preset = self.converter_obj.PresetH264.veryslow
         tune = self.converter_obj.TuneH264[tune]
-        audio_bitrate_kilobit = 196
+        audio_bitrate_kilobit = 256
         crf = 24
 
         if width is None:
@@ -1365,7 +1379,7 @@ class Youtube:
         self.converter_obj.extract_screenshot_from_video(
             file=res.in_file,
             out_file_image=Path(r'C:\Users\T\Videos\screenshot.png'),
-            start_time='00:00:03'
+            start_time=self.preview_time.get()
         )
 
         sound_ok()
@@ -1417,10 +1431,10 @@ class Youtube:
             file_path = Path(cache_item)
 
             if file_path.is_file():
-                file = fd.askopenfilename(initialfile=cache_item)
+                file = fd.askopenfilename(initialfile=file_path, initialdir=file_path.parent)
 
             else:
-                file = fd.askopenfilename(initialdir=cache_item)
+                file = fd.askopenfilename(initialdir=file_path)
 
         file = Path(file)
 
