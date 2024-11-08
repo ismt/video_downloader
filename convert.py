@@ -26,6 +26,28 @@ import diskcache
 from pymediainfo import MediaInfo
 
 
+class TuneH264(enum.Enum):
+    FILM = 0
+    ANIMATION = 1
+    GRAIN = 2
+    STILLIMAGE = 3
+    FASTDECODE = 4
+    ZEROLATENCY = 5
+
+
+class PresetH264(enum.Enum):
+    ULTRAFAST = 'ULTRAFAST'
+    SUPERFAST = 'SUPERFAST'
+    VERYFAST = 'VERYFAST'
+    FASTER = 'FASTER'
+    FAST = 'FAST'
+    MEDIUM = 'MEDIUM'
+    SLOW = 'SLOW'
+    SLOWER = 'SLOWER'
+    VERYSLOW = 'VERYSLOW'
+    PLACEBO = 'PLACEBO'
+
+
 class Converter:
 
     def __init__(self):
@@ -36,26 +58,6 @@ class Converter:
         self.tmp_dir = self.script_dir / 'tmp'
 
         self.cache = diskcache.Cache((self.tmp_dir / 'converter_cache').as_posix())
-
-    class TuneH264(enum.Enum):
-        FILM = 0
-        ANIMATION = 1
-        GRAIN = 2
-        STILLIMAGE = 3
-        FASTDECODE = 4
-        ZEROLATENCY = 5
-
-    class PresetH264(enum.Enum):
-        ULTRAFAST = 'ULTRAFAST'
-        SUPERFAST = 'SUPERFAST'
-        VERYFAST = 'VERYFAST'
-        FASTER = 'FASTER'
-        FAST = 'FAST'
-        MEDIUM = 'MEDIUM'
-        SLOW = 'SLOW'
-        SLOWER = 'SLOWER'
-        VERYSLOW = 'VERYSLOW'
-        PLACEBO = 'PLACEBO'
 
     @dataclasses.dataclass
     class ConvertResult:
@@ -1035,7 +1037,7 @@ class Youtube:
         self.edit_end_video_time.insert(0, '08:00:00')
         self.edit_end_video_time.pack(fill='x', padx=padx, pady=pady)
 
-        tune = ttk.Combobox(self.root, values=list(i.name for i in self.converter_obj.TuneH264))
+        tune = ttk.Combobox(self.root, values=list(i.name for i in TuneH264))
 
         tune.current(0)
 
@@ -1274,10 +1276,10 @@ class Youtube:
 
         track_video = self.converter_obj.get_video_media_info(file=file)
 
-        preset = self.converter_obj.PresetH264.VERYSLOW
-        tune = self.converter_obj.TuneH264[tune]
+        preset = PresetH264.VERYSLOW
+        tune = TuneH264(TuneH264[tune])
         audio_bitrate_kilobit = 256
-        crf = 24
+        crf = 23
 
         if width is None:
             out_video = self.converter_obj.h264(
@@ -1343,8 +1345,8 @@ class Youtube:
             # end_time='02:30:00',
             # height=144,
             # fps=30,
-            preset=self.converter_obj.PresetH264.ULTRAFAST,
-            tune=self.converter_obj.TuneH264.FILM,
+            preset=PresetH264.ULTRAFAST,
+            tune=TuneH264.FILM,
             # copy_audio=True,
             # copy_video=True
 
