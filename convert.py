@@ -38,24 +38,24 @@ class Converter:
         self.cache = diskcache.Cache((self.tmp_dir / 'converter_cache').as_posix())
 
     class TuneH264(enum.Enum):
-        film = 0
-        animation = 1
-        grain = 2
-        stillimage = 3
-        fastdecode = 4
-        zerolatency = 5
+        FILM = 0
+        ANIMATION = 1
+        GRAIN = 2
+        STILLIMAGE = 3
+        FASTDECODE = 4
+        ZEROLATENCY = 5
 
     class PresetH264(enum.Enum):
-        ultrafast = enum.auto()
-        superfast = enum.auto()
-        veryfast = enum.auto()
-        faster = enum.auto()
-        fast = enum.auto()
-        medium = enum.auto()
-        slow = enum.auto()
-        slower = enum.auto()
-        veryslow = enum.auto()
-        placebo = enum.auto()
+        ULTRAFAST = 'ULTRAFAST'
+        SUPERFAST = 'SUPERFAST'
+        VERYFAST = 'VERYFAST'
+        FASTER = 'FASTER'
+        FAST = 'FAST'
+        MEDIUM = 'MEDIUM'
+        SLOW = 'SLOW'
+        SLOWER = 'SLOWER'
+        VERYSLOW = 'VERYSLOW'
+        PLACEBO = 'PLACEBO'
 
     @dataclasses.dataclass
     class ConvertResult:
@@ -144,10 +144,10 @@ class Converter:
             start_time: str or None = '00:00:00',
             end_time: str or None = None,
             length_time: str or None = None,  # '00:00:00'
-            preset: PresetH264 = PresetH264.medium,
+            preset: PresetH264 = PresetH264.MEDIUM,
             copy_audio: bool = False,
             copy_video: bool = False,
-            tune: TuneH264 = TuneH264.film,
+            tune: TuneH264 = TuneH264.FILM,
             audio_bitrate_kilobit: int = 192,
             fps: int = None,
             first_frame_image: Union[Path, str] = None,
@@ -662,8 +662,8 @@ class Converter:
             start_time='00:00:00',
             end_time=None,
             start_height=50,
-            preset: PresetH264 = PresetH264.medium,
-            tune: TuneH264 = TuneH264.film,
+            preset: PresetH264 = PresetH264.MEDIUM,
+            tune: TuneH264 = TuneH264.FILM,
             fps: int = None
     ):
 
@@ -799,8 +799,8 @@ class Converter:
             start_time: str or None = '00:00:00',
             end_time: str or None = None,
             length_time: str or None = None,  # '00:00:00'
-            preset: PresetH264 = PresetH264.medium,
-            tune: TuneH264 = TuneH264.film,
+            preset: PresetH264 = PresetH264.MEDIUM,
+            tune: TuneH264 = TuneH264.FILM,
     ):
 
         # https://trac.ffmpeg.org/wiki/Encode/H.264
@@ -1274,7 +1274,7 @@ class Youtube:
 
         track_video = self.converter_obj.get_video_media_info(file=file)
 
-        preset = self.converter_obj.PresetH264.veryslow
+        preset = self.converter_obj.PresetH264.VERYSLOW
         tune = self.converter_obj.TuneH264[tune]
         audio_bitrate_kilobit = 256
         crf = 24
@@ -1343,8 +1343,8 @@ class Youtube:
             # end_time='02:30:00',
             # height=144,
             # fps=30,
-            preset=self.converter_obj.PresetH264.ultrafast,
-            tune=self.converter_obj.TuneH264.film,
+            preset=self.converter_obj.PresetH264.ULTRAFAST,
+            tune=self.converter_obj.TuneH264.FILM,
             # copy_audio=True,
             # copy_video=True
 
