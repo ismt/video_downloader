@@ -154,6 +154,8 @@ class Converter:
             fps: int = None,
             first_frame_image: Union[Path, str] = None,
             hardware_encode: bool = False,
+            # https://en.wikipedia.org/wiki/Advanced_Video_Coding#Decoded_picture_buffering
+            h264_level: str = '3'
     ):
 
         # https://trac.ffmpeg.org/wiki/Encode/H.264
@@ -237,8 +239,8 @@ class Converter:
             params += ['-aac_coder', 'fast']
 
         params += ['-g', f'{fps * 2}']
-        # Для 2.2 разрешение не больше 720
-        params += ['-level', '2.2']
+
+        params += ['-level', h264_level]
 
         # params += ['-filter:v', f'crop=in_w-800:in_h']
 
