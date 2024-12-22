@@ -462,7 +462,7 @@ class Converter:
 
         params += ['-compression_level', '0']
 
-        params += ['-cutoff', '22000']
+        params += ['-cutoff', '48000']
 
         params += ['-joint_stereo', '0']
 
@@ -999,7 +999,7 @@ class Youtube:
         button = ttk.Button(
             self.root,
             text="Скачать ролик с любого хостнга",
-            command=lambda: self.download_any(height=selected_size.get()),
+            command=lambda: self.download_any(),
 
         )
 
@@ -1065,6 +1065,14 @@ class Youtube:
             self.root,
             text="Конвертация FLAC",
             command=lambda: self.convert_to_flac()
+        )
+
+        button.pack(fill='x', padx=padx, pady=pady)
+
+        button = ttk.Button(
+            self.root,
+            text="Конвертация MP3",
+            command=lambda: self.convert_to_mp3()
         )
 
         button.pack(fill='x', padx=padx, pady=pady)
@@ -1195,7 +1203,7 @@ class Youtube:
         self.status = 'Ок'
 
     @validate_arguments()
-    def download_any(self, height: Union[int, str] = None):
+    def download_any(self):
 
         url = self.tkinter_root.clipboard_get()
 
@@ -1219,10 +1227,7 @@ class Youtube:
         # params += ['--write-auto-subs']
         params += ['--force-overwrites']
 
-        if height:
-            height = int(height)
-
-            params += ['-f', f'best[height={height}]']
+        params += ['-f', f'best']
 
         params += ['-o', self.file_name_format]
 
