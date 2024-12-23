@@ -15,7 +15,7 @@ from tkinter import filedialog as fd
 
 import time
 
-from pydantic import validate_arguments
+from pydantic import validate_call
 
 from tkinter import Tk, ttk
 
@@ -65,7 +65,7 @@ class Converter:
         out_file: Path
 
     @staticmethod
-    @validate_arguments()
+    @validate_call()
     def exec_ffmpeg(args: list):
         args2 = []
 
@@ -92,7 +92,7 @@ class Converter:
 
         return True
 
-    @validate_arguments()
+    @validate_call()
     def vp9(self, file: Path = None, width: int = None, crf: int = 23, vorbis_quality: int = 7):
 
         if not file:
@@ -136,7 +136,7 @@ class Converter:
 
         self.exec_ffmpeg(params)
 
-    # @validate_arguments()
+    # @validate_call()
     def h264(
             self,
             file: Path = None,
@@ -352,7 +352,7 @@ class Converter:
 
         return out_file
 
-    @validate_arguments()
+    @validate_call()
     def av1(
             self,
             file: Path = None,
@@ -424,7 +424,7 @@ class Converter:
 
         return out_file
 
-    @validate_arguments()
+    @validate_call()
     def mp3(
             self,
             file: Path = None,
@@ -479,7 +479,7 @@ class Converter:
 
         return self.ConvertResult(in_file=file, out_file=out_file)
 
-    @validate_arguments()
+    @validate_call()
     def aac(
             self,
             file: Path = None,
@@ -529,7 +529,7 @@ class Converter:
 
         return self.ConvertResult(in_file=file, out_file=out_file)
 
-    @validate_arguments()
+    @validate_call()
     def flac(
             self,
             file: Path = None,
@@ -622,7 +622,7 @@ class Converter:
 
         return out_file
 
-    @validate_arguments()
+    @validate_call()
     def extract_screenshot_from_video(self, out_file_image: Path, file: Path = None, start_time: str = '00:00:00', ):
 
         if not file:
@@ -657,7 +657,7 @@ class Converter:
 
         return out_file
 
-    @validate_arguments()
+    @validate_call()
     def to_size(
             self,
             max_size_bytes: int,
@@ -729,7 +729,7 @@ class Converter:
 
         return True
 
-    @validate_arguments()
+    @validate_call()
     def delogo(
             self,
             x: int,
@@ -793,7 +793,7 @@ class Converter:
 
         return track_video
 
-    @validate_arguments()
+    @validate_call()
     def mkv_h264_pcm(
             self,
             file: Path = None,
@@ -871,7 +871,7 @@ class Converter:
 
         shutil.move(out_file_local, out_file)
 
-    @validate_arguments()
+    @validate_call()
     def vorbis(
             self,
             file: Path = None,
@@ -1092,7 +1092,7 @@ class Youtube:
 
         self.root.mainloop()
 
-    @validate_arguments()
+    @validate_call()
     def download_archive(self, height: int = 720, convert_to_mp4: bool = False):
 
         url = self.tkinter_root.clipboard_get()
@@ -1202,7 +1202,7 @@ class Youtube:
 
         self.status = 'Ок'
 
-    @validate_arguments()
+    @validate_call()
     def download_any(self):
 
         url = self.tkinter_root.clipboard_get()
@@ -1452,7 +1452,7 @@ class Youtube:
 
         return file
 
-    @validate_arguments()
+    @validate_call()
     def download_audio(self):
         self.status = 'Старт'
 
