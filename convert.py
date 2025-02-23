@@ -155,7 +155,7 @@ class Converter:
             first_frame_image: Union[Path, str] = None,
             hardware_encode: bool = False,
             # https://en.wikipedia.org/wiki/Advanced_Video_Coding#Decoded_picture_buffering
-            h264_level: str = '3'
+            h264_level: str = '3.2'
     ):
 
         # https://trac.ffmpeg.org/wiki/Encode/H.264
@@ -223,10 +223,10 @@ class Converter:
         #     params += ['-r', str(fps)]
 
         if width:
-            params += ['-vf', f'scale={width}:-1:flags=lanczos']
+            params += ['-vf', f'scale={width}:trunc(ow/a/2)*2:flags=lanczos']
 
         elif height:
-            params += ['-vf', f'scale={-1}:{height}:flags=lanczos']
+            params += ['-vf', f'scale=trunc(ow/a/2)*2:{height}:flags=lanczos']
 
         if copy_audio:
             params += ['-c:a', 'copy']
