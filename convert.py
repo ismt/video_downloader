@@ -25,6 +25,8 @@ import diskcache
 
 from pymediainfo import MediaInfo
 
+import requests
+
 
 class TuneH264(enum.Enum):
     FILM = 0
@@ -1151,11 +1153,25 @@ class Youtube:
         self.status = 'Ок'
 
     def update_yt_dlp(self):
-        params = []
+        if not self.yt_dlp_file.is_file():
+            url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+            output_path = "yt-dlp.exe"
 
-        params += [self.yt_dlp_file, '-U']
+            with requests.get(url, stream=True) as r:
+                r.raise_for_status()
+                with open(output_path, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
 
-        self.converter_obj.exec_ffmpeg(params)
+            print(f"Файл сохранён как {output_path}")
+
+        else:
+            params = []
+
+            params += [self.yt_dlp_file, '-U']
+
+            self.converter_obj.exec_ffmpeg(params)
 
     def create_link(self):
         initial_dir = Path('c:/ProjectsMy/youtube/download')
