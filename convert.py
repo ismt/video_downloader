@@ -51,7 +51,7 @@ class PresetH264(enum.Enum):
 class Converter:
 
     def __init__(self):
-        self.ffmpeg_file = Path(r'C:\ProgramData\chocolatey\bin\ffmpeg.exe')
+        self.ffmpeg_file = Path(r'C:\Users\T\AppData\Local\UniGetUI\Chocolatey\lib\ffmpeg-full\tools\ffmpeg\bin\ffmpeg.exe')
 
         self.script_dir = Path(__file__).parent
 
@@ -923,7 +923,15 @@ class Converter:
 
 
 class Youtube:
-    def __init__(self):
+    def __init__(
+            self,
+            cookies_from_browser: str = None,
+            proxy: str = None,
+    ):
+
+        self.cookies_from_browser = cookies_from_browser
+        self.proxy = proxy
+
         self.file_name_format = '"../download/%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s.%(ext)s"'
         self.file_name_format_audio = '"../download/%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s audio.%(ext)s"'
 
@@ -1093,7 +1101,12 @@ class Youtube:
         self.root.mainloop()
 
     @validate_call()
-    def download_archive(self, height: int = 720, convert_to_mp4: bool = False):
+    def download_archive(
+            self, height: int = 720,
+            convert_to_mp4: bool = False,
+    ):
+
+        # https://github.com/yt-dlp/yt-dlp
 
         url = self.tkinter_root.clipboard_get()
 
@@ -1112,9 +1125,9 @@ class Youtube:
 
         params += ['--embed-chapters']
         params += ['--yes-playlist']
-        params += ['--embed-subs']
-        params += ['--sub-langs', 'ru,en,ua,ja']
-        params += ['--write-auto-subs']
+        # params += ['--embed-subs']
+        # params += ['--sub-langs', 'ru,en,ua,ja']
+        # params += ['--write-auto-subs']
         params += ['--force-overwrites']
 
         if convert_to_mp4:
@@ -1122,6 +1135,12 @@ class Youtube:
 
         params += ['-f', f'bestvideo[height<={height}]+bestaudio']
         params += ['-o', self.file_name_format]
+
+        if self.cookies_from_browser:
+            params += ['--cookies-from-browser', self.cookies_from_browser]
+
+        if self.cookies_from_browser:
+            params += ['--proxy', self.proxy]
 
         if not self.converter_obj.exec_ffmpeg(params):
 
@@ -1527,4 +1546,4 @@ def filter_float(value: str):
     return value3
 
 
-youtube = Youtube()
+youtube = Youtube(cookies_from_browser='firefox:24x3vwfc.tmp', proxy='socks5://192.168.2.87:38018')
