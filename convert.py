@@ -63,7 +63,18 @@ def reader(stream, target, out_lines: list[str], out_obj: Any = None):
 
 @validate_call()
 def exec_command(args: list, out_obj: Any = None):
-    process = subprocess.Popen(args=args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf8', errors='ignore')
+    args2 = []
+
+    for i in args:
+        if type(i) is str:
+            args2.append(str(i))
+
+        else:
+            args2.append(f'"{i}"')
+
+    cmd = ' '.join(args2)
+
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf8', errors='ignore')
 
     out_std = []
     out_err = []
@@ -132,7 +143,6 @@ class Converter:
             else:
                 args2.append(f'"{i}"')
 
-        cmd = ' '.join(args2)
 
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=False)
 
