@@ -4,10 +4,12 @@ import os
 import re
 import shutil
 import subprocess
+import sys
+import threading
 from operator import itemgetter
 
 from pathlib import Path
-from typing import Literal, Union
+from typing import Literal, Union, Any
 
 import winsound
 
@@ -50,9 +52,56 @@ class PresetH264(enum.Enum):
     PLACEBO = 'PLACEBO'
 
 
+def reader(stream, target, out_lines: list[str], out_obj: Any = None):
+    for line in stream:
+        target.write(line)
+
+        out_lines.append(line)
+
+        target.flush()
+
+
+@validate_call()
+def exec_command(args: list, out_obj: Any = None):
+    process = subprocess.Popen(args=args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf8', errors='ignore')
+
+    out_std = []
+    out_err = []
+
+    t1 = threading.Thread(target=reader, args=(process.stdout, sys.stdout, out_std, out_obj))
+    t2 = threading.Thread(target=reader, args=(process.stderr, sys.stderr, out_err, out_obj))
+
+    t1.start()
+    t2.start()
+
+    process.wait()
+
+    t1.join()
+    t2.join()
+
+    if isinstance(out_obj, tkinter.Text):
+        out_obj.delete('1.0', 'end')
+
+        if out_std:
+            out_obj.insert(tkinter.END, 'Вывод -------------------------------' + "\n")
+
+            for line in out_std:
+                out_obj.insert(tkinter.END, line + "\n")
+
+        if out_err:
+            out_obj.insert(tkinter.END, 'Ошибки -------------------------------' + "\n")
+
+            for line in out_err:
+                out_obj.insert(tkinter.END, line + "\n")
+
+        out_obj.see(tkinter.END)
+
+    return process.returncode == 0
+
+
 class Converter:
 
-    def __init__(self):
+    def __init__(self, out_obj: Any = None):
         self.ffmpeg_file = Path(r'C:\Users\T\AppData\Local\UniGetUI\Chocolatey\lib\ffmpeg-full\tools\ffmpeg\bin\ffmpeg.exe')
 
         self.script_dir = Path(__file__).parent
@@ -61,14 +110,19 @@ class Converter:
 
         self.cache = diskcache.Cache((self.tmp_dir / 'converter_cache').as_posix())
 
+        self.out_obj = out_obj
+
     @dataclasses.dataclass
     class ConvertResult:
         in_file: Path
         out_file: Path
 
-    @staticmethod
     @validate_call()
-    def exec_ffmpeg(args: list):
+    def exec_ffmpeg(self, args: list):
+        res = exec_command(args=args, out_obj=self.out_obj)
+
+        return res
+
         args2 = []
 
         for i in args:
@@ -639,7 +693,7 @@ class Converter:
 
         params += ['-ss', start_time]
         params += ['-frames:v', '1']
-        # params += ['-update', 'true']
+        params += ['-update', 'true']
 
         out_file = out_file_image.with_suffix('.png')
 
@@ -941,11 +995,9 @@ class Youtube:
 
         self.tkinter_root = Tk()
 
-        self.converter_obj = Converter()
-
         self.root = self.tkinter_root
 
-        self.root.geometry('500x750')
+        self.root.geometry('1000x750+50+50')
 
         self.root.resizable(False, False)
 
@@ -963,6 +1015,24 @@ class Youtube:
         padx = 3
         pady = 3
 
+        style = ttk.Style()
+        style.configure('Colored.TFrame', background='lightgray')
+
+        self.paned = ttk.PanedWindow(self.root, orient='horizontal')
+        self.paned.pack(fill='both', expand=True)
+
+        self.left_panel = ttk.Frame(self.paned, padding=5)
+        self.paned.add(self.left_panel, weight=1)
+
+        self.right_panel = ttk.Frame(self.paned, padding=5)
+        self.paned.add(self.right_panel, weight=1)
+
+        self.root.update_idletasks()
+
+        # self.paned.sashpos(0, 500)
+
+        self.root.after(100, lambda: self.paned.sashpos(0, 300))
+
         selected_size = tkinter.StringVar(value='480')
         sizes = (
             ('Высота 1080', 1080),
@@ -977,7 +1047,7 @@ class Youtube:
 
         for size in sizes:
             r = ttk.Radiobutton(
-                self.root,
+                self.left_panel,
                 text=size[0],
                 value=size[1],
                 variable=selected_size
@@ -989,7 +1059,7 @@ class Youtube:
         # checkbox_mp4.pack(fill='x', padx=padx, pady=pady)
 
         button = ttk.Button(
-            self.root,
+            self.left_panel,
             text="Скачать ютуб",
             command=lambda: self.exec_button(size_video=selected_size),
 
@@ -998,7 +1068,7 @@ class Youtube:
         button.pack(fill='x', padx=padx, pady=pady)
 
         self.button_download_audio = ttk.Button(
-            self.root,
+            self.left_panel,
             text="Скачать ютуб аудио ",
             command=lambda: self.download_audio()
 
@@ -1007,7 +1077,7 @@ class Youtube:
         self.button_download_audio.pack(fill='x', padx=padx, pady=pady)
 
         button = ttk.Button(
-            self.root,
+            self.left_panel,
             text="Скачать ролик с любого хостнга",
             command=lambda: self.download_any(),
 
@@ -1016,7 +1086,7 @@ class Youtube:
         button.pack(fill='x', padx=padx, pady=pady)
 
         button = ttk.Button(
-            self.root,
+            self.left_panel,
             text="Конвертация Телеграм",
             command=lambda: self.convert_to_telegram(
                 tune=tune.get(),
@@ -1028,35 +1098,35 @@ class Youtube:
 
         button.pack(fill='x', padx=padx, pady=pady)
 
-        self.label1 = ttk.Label(self.root, text='Время для превью')
+        self.label1 = ttk.Label(self.left_panel, text='Время для превью')
         self.label1.pack(fill='x', padx=padx, pady=pady)
 
-        self.preview_time = ttk.Entry(self.root)
+        self.preview_time = ttk.Entry(self.left_panel)
         self.preview_time.insert(0, '00:00:05')
         self.preview_time.pack(fill='x', padx=padx, pady=pady)
 
-        self.label2 = ttk.Label(self.root, text='Начало видео')
+        self.label2 = ttk.Label(self.left_panel, text='Начало видео')
         self.label2.pack(fill='x', padx=padx, pady=pady)
 
-        self.edit_start_video_time = ttk.Entry(self.root)
+        self.edit_start_video_time = ttk.Entry(self.left_panel)
         self.edit_start_video_time.insert(0, '00:00:00')
         self.edit_start_video_time.pack(fill='x', padx=padx, pady=pady)
 
-        self.label3 = ttk.Label(self.root, text='Конец видео')
+        self.label3 = ttk.Label(self.left_panel, text='Конец видео')
         self.label3.pack(fill='x', padx=padx, pady=pady)
 
-        self.edit_end_video_time = ttk.Entry(self.root)
+        self.edit_end_video_time = ttk.Entry(self.left_panel)
         self.edit_end_video_time.insert(0, '08:00:00')
         self.edit_end_video_time.pack(fill='x', padx=padx, pady=pady)
 
-        tune = ttk.Combobox(self.root, values=list(i.name for i in TuneH264))
+        tune = ttk.Combobox(self.left_panel, values=list(i.name for i in TuneH264))
 
         tune.current(0)
 
         tune.pack(fill='x', padx=padx, pady=pady)
 
         button = ttk.Button(
-            self.root,
+            self.left_panel,
             text="Конвертация быстро",
             command=self.convert_fast
         )
@@ -1064,7 +1134,7 @@ class Youtube:
         button.pack(fill='x', padx=padx, pady=pady)
 
         button = ttk.Button(
-            self.root,
+            self.left_panel,
             text="Конвертация Vorbis",
             command=lambda: self.convert_to_vorbis()
         )
@@ -1072,7 +1142,7 @@ class Youtube:
         button.pack(fill='x', padx=padx, pady=pady)
 
         button = ttk.Button(
-            self.root,
+            self.left_panel,
             text="Конвертация FLAC",
             command=lambda: self.convert_to_flac()
         )
@@ -1080,7 +1150,7 @@ class Youtube:
         button.pack(fill='x', padx=padx, pady=pady)
 
         button = ttk.Button(
-            self.root,
+            self.left_panel,
             text="Конвертация MP3",
             command=lambda: self.convert_to_mp3()
         )
@@ -1088,15 +1158,31 @@ class Youtube:
         button.pack(fill='x', padx=padx, pady=pady)
 
         button = ttk.Button(
-            self.root,
+            self.left_panel,
             text="Обновить yt-dlp",
             command=lambda: self.update_yt_dlp()
         )
 
         button.pack(fill='x', padx=padx, pady=pady)
 
-        self.label_status = ttk.Label(self.root, text="")
+        self.label_status = ttk.Label(self.left_panel, text="")
         self.label_status.pack(fill='x', padx=padx, pady=pady)
+
+        # === Правая панель: текстовое поле с прокруткой ===
+        self.text_output = tkinter.Text(self.right_panel, wrap='word', height=30)
+        scrollbar = ttk.Scrollbar(
+            self.right_panel, orient='vertical', command=self.text_output.yview
+        )
+        self.text_output.configure(yscrollcommand=scrollbar.set)
+
+        # Размещаем в правой панели
+        self.text_output.pack(side='left', fill='both', expand=True)
+        scrollbar.pack(side='right', fill='y')
+
+        # self.text_output.insert(tkinter.END, 'ttt'+"\n")
+        # self.text_output.insert(tkinter.END, 'ttt'+"\n")
+
+        self.converter_obj = Converter(out_obj=self.text_output)
 
         self.status = None
 
@@ -1171,7 +1257,7 @@ class Youtube:
 
             params += [self.yt_dlp_file, '-U']
 
-            self.converter_obj.exec_ffmpeg(params)
+            exec_command(params, self.text_output)
 
     def create_link(self):
         initial_dir = Path('c:/ProjectsMy/youtube/download')
@@ -1509,9 +1595,9 @@ class Youtube:
         # params += ['--audio-format', 'flac']
         params += ['--embed-chapters']
         params += ['--yes-playlist']
-        params += ['--embed-subs']
-        params += ['--sub-langs', 'ru,en,ua,ja']
-        params += ['--write-auto-subs']
+        # params += ['--embed-subs']
+        # params += ['--sub-langs', 'ru,en,ua,ja']
+        # params += ['--write-auto-subs']
 
         params += ['-f', f'bestaudio']
         params += ['-o', self.file_name_format_audio]
@@ -1562,4 +1648,7 @@ def filter_float(value: str):
     return value3
 
 
-youtube = Youtube(cookies_from_browser='firefox:24x3vwfc.tmp', proxy='socks5://192.168.2.87:38018')
+youtube = Youtube(
+    # cookies_from_browser='firefox:24x3vwfc.tmp',
+    # proxy='socks5://192.168.2.87:38018'
+)
