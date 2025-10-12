@@ -74,7 +74,9 @@ def exec_command(args: list, out_obj: Any = None):
 
     cmd = ' '.join(args2)
 
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf8', errors='ignore')
+    process = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf8', errors='ignore', shell=True
+    )
 
     out_std = []
     out_err = []
@@ -142,7 +144,6 @@ class Converter:
 
             else:
                 args2.append(f'"{i}"')
-
 
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=False)
 
