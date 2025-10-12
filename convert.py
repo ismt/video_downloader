@@ -63,19 +63,17 @@ def reader(stream, target, out_lines: list[str], out_obj: Any = None):
 
 @validate_call()
 def exec_command(args: list, out_obj: Any = None):
-    args2 = []
-
-    for i in args:
-        if type(i) is str:
-            args2.append(str(i))
-
-        else:
-            args2.append(f'"{i}"')
-
-    cmd = ' '.join(args2)
+    # args2 = []
+    #
+    # for i in args:
+    #     if isinstance(i,(str,int,float,Path)):
+    #         args2.append(str(i))
+    #
+    #     else:
+    #         args2.append(f'"{i}"')
 
     process = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf8', errors='ignore', shell=True
+        args=args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf8', errors='ignore', shell=False
     )
 
     out_std = []
@@ -119,6 +117,8 @@ class Converter:
 
         self.script_dir = Path(__file__).parent
 
+        self.select_start_dir = Path('c:/ProjectsMy/youtube/download')
+
         self.tmp_dir = self.script_dir / 'tmp'
 
         self.cache = diskcache.Cache((self.tmp_dir / 'converter_cache').as_posix())
@@ -136,34 +136,11 @@ class Converter:
 
         return res
 
-        args2 = []
-
-        for i in args:
-            if type(i) is str:
-                args2.append(str(i))
-
-            else:
-                args2.append(f'"{i}"')
-
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=False)
-
-        (out, err) = proc.communicate()
-
-        if out is not None:
-            print(out.decode('utf-8', errors='replace'))
-
-        if err is not None:
-            print(err.decode('utf-8', errors='replace'))
-
-            return False
-
-        return True
-
     @validate_call()
     def vp9(self, file: Path = None, width: int = None, crf: int = 23, vorbis_quality: int = 7):
 
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=self.select_start_dir)
             file = Path(file)
 
         self.exec_ffmpeg(
@@ -210,9 +187,9 @@ class Converter:
             width: int = None,
             height: int = None,
             crf: int = 23,
-            start_time: str or None = '00:00:00',
-            end_time: str or None = None,
-            length_time: str or None = None,  # '00:00:00'
+            start_time: Union[str,None] = '00:00:00',
+            end_time: Union[str,None] = None,
+            length_time: Union[str,None] = None,  # '00:00:00'
             preset: PresetH264 = PresetH264.MEDIUM,
             copy_audio: bool = False,
             copy_video: bool = False,
@@ -230,7 +207,7 @@ class Converter:
         # https://github.com/rdp/ffmpeg-windows-build-helpers
 
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=self.select_start_dir)
             file = Path(file)
 
         start = time.monotonic()
@@ -436,7 +413,7 @@ class Converter:
         # https://github.com/rdp/ffmpeg-windows-build-helpers
 
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=self.select_start_dir)
             file = Path(file)
 
         start = time.monotonic()
@@ -500,7 +477,7 @@ class Converter:
             end_time: str = None
     ):
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=self.select_start_dir)
             file = Path(file)
 
         start = time.monotonic()
@@ -555,7 +532,7 @@ class Converter:
             end_time: str = None
     ):
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=self.select_start_dir)
             file = Path(file)
 
         start = time.monotonic()
@@ -605,7 +582,7 @@ class Converter:
             end_time: str = None
     ):
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=self.select_start_dir)
             file = Path(file)
 
         start = time.monotonic()
@@ -655,10 +632,10 @@ class Converter:
     def add_video_preview(self, file: Union[Path, str], image: Union[Path, str], width: int, height: int, fps: int, ):
 
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=self.select_start_dir)
 
         if not image:
-            image = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            image = fd.askopenfilename(initialdir=self.select_start_dir)
 
         file = Path(file)
 
@@ -693,7 +670,7 @@ class Converter:
     def extract_screenshot_from_video(self, out_file_image: Path, file: Path = None, start_time: str = '00:00:00', ):
 
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=self.select_start_dir)
             file = Path(file)
 
         params = []
@@ -741,7 +718,7 @@ class Converter:
         cache_item = self.cache.get('to_size_file_path')
 
         if not cache_item:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=self.select_start_dir)
 
         else:
             file = fd.askopenfilename(initialdir=cache_item)
@@ -810,7 +787,7 @@ class Converter:
 
     ):
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=self.select_start_dir)
             file = Path(file)
 
         start = time.monotonic()
@@ -867,9 +844,9 @@ class Converter:
             width: int = None,
             height: int = None,
             crf: int = 23,
-            start_time: str or None = '00:00:00',
-            end_time: str or None = None,
-            length_time: str or None = None,  # '00:00:00'
+            start_time: Union[str,None] = '00:00:00',
+            end_time: Union[str,None] = None,
+            length_time: Union[str,None] = None,  # '00:00:00'
             preset: PresetH264 = PresetH264.MEDIUM,
             tune: TuneH264 = TuneH264.FILM,
     ):
@@ -879,7 +856,7 @@ class Converter:
         # https://github.com/rdp/ffmpeg-windows-build-helpers
 
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=self.select_start_dir)
             file = Path(file)
 
         out_file = rf'C:\Users\T\Videos\{file.stem}__{crf}_{width}_{height}-{tune.name}.mkv'
@@ -949,7 +926,7 @@ class Converter:
             end_time: str = None
     ):
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=self.select_start_dir)
             file = Path(file)
 
         start = time.monotonic()
@@ -999,10 +976,10 @@ class Youtube:
         self.cookies_from_browser = cookies_from_browser
         self.proxy = proxy
 
-        self.file_name_format = '"../download/%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s.%(ext)s"'
-        self.file_name_format_audio = '"../download/%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s audio.%(ext)s"'
+        self.file_name_format = Path('../download/%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s.%(ext)s')
+        self.file_name_format_audio = Path('../download/%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s audio.%(ext)s')
 
-        self.yt_dlp_file = Path('./yt-dlp.exe')
+        self.yt_dlp_file = Path(__file__).parent / 'yt-dlp.exe'
 
         self.tkinter_root = Tk()
 
@@ -1018,10 +995,9 @@ class Youtube:
 
         self.tmp_dir = self.script_dir / 'tmp'
 
-        self.cache = diskcache.Cache((self.tmp_dir / 'youtube_cache').as_posix())
+        self.select_start_dir = Path('c:/ProjectsMy/youtube/download')
 
-        # label = ttk.Label(text=self.root.clipboard_get())
-        # label.pack(fill='x', padx=5, pady=pady)
+        self.cache = diskcache.Cache((self.tmp_dir / 'youtube_cache').as_posix())
 
         padx = 3
         pady = 3
@@ -1065,10 +1041,6 @@ class Youtube:
             )
             r.pack(fill='x', padx=padx, pady=pady)
 
-        # convert_to_mp4 = tkinter.BooleanVar(value=False)
-        # checkbox_mp4 = ttk.Checkbutton(text='В mp4', variable=convert_to_mp4, onvalue=True, offvalue=False)
-        # checkbox_mp4.pack(fill='x', padx=padx, pady=pady)
-
         button = ttk.Button(
             self.left_panel,
             text="Скачать ютуб",
@@ -1105,6 +1077,15 @@ class Youtube:
                 start_time=self.edit_start_video_time.get(),
                 end_time=self.edit_end_video_time.get()
             )
+        )
+
+        button.pack(fill='x', padx=padx, pady=pady)
+
+        button = ttk.Button(
+            self.left_panel,
+            text="Извлечь аудио",
+            command=lambda: self.extract_audio_button(),
+
         )
 
         button.pack(fill='x', padx=padx, pady=pady)
@@ -1271,9 +1252,7 @@ class Youtube:
             exec_command(params, self.text_output)
 
     def create_link(self):
-        initial_dir = Path('c:/ProjectsMy/youtube/download')
-
-        len_initial_dir_parts = len(initial_dir.parts)
+        initial_dir = self.select_start_dir
 
         if source := fd.askopenfilename(initialdir=initial_dir, title='Источник для ссылки'):
 
@@ -1281,7 +1260,7 @@ class Youtube:
 
             # source = Path(*source.parts[len_initial_dir_parts:])
 
-            if target := fd.askdirectory(initialdir='c:/ProjectsMy/youtube/download', title='В какую папку ссылка'):
+            if target := fd.askdirectory(initialdir=self.select_start_dir, title='В какую папку ссылка'):
 
                 target = Path(target)
 
@@ -1295,7 +1274,7 @@ class Youtube:
 
     def exec_button(self, size_video, convert_to_mp4: bool = False):
 
-        self.status = 'Статус'
+        self.status = 'Старт'
 
         size_video_var = size_video.get()
 
@@ -1374,14 +1353,14 @@ class Youtube:
 
     def convert_to_telegram(self, tune: str, height: Union[int, str] = None, start_time: str = '00:00:00', end_time: str = None):
 
-        file = self.open_file_with_cache(start_dir='c:/ProjectsMy/youtube/download', cache_key='convert_to_telegram')
+        file = self.open_file_with_cache(start_dir=self.select_start_dir, cache_key='convert_to_telegram')
 
         if file.as_posix() == '.':
             self.sound_error()
 
             return
 
-        preview = self.open_file_with_cache(start_dir='c:/ProjectsMy/youtube/download', cache_key='convert_to_telegram_preview')
+        preview = self.open_file_with_cache(start_dir=self.select_start_dir, cache_key='convert_to_telegram_preview')
 
         if preview.as_posix() == '.':
             preview = self.converter_obj.extract_screenshot_from_video(
@@ -1496,7 +1475,7 @@ class Youtube:
     def convert_to_mp3(self):
         self.status = 'Статус'
 
-        file = self.open_file_with_cache(start_dir='c:/ProjectsMy/youtube/download', cache_key='convert_to_mp3')
+        file = self.open_file_with_cache(start_dir=self.select_start_dir, cache_key='convert_to_mp3')
 
         res = self.converter_obj.mp3(file=file, start_time='00:00:00')
 
@@ -1513,7 +1492,7 @@ class Youtube:
     def convert_to_vorbis(self):
         self.status = 'Статус'
 
-        file = self.open_file_with_cache(start_dir='c:/ProjectsMy/youtube/download', cache_key='convert_to_vorbis')
+        file = self.open_file_with_cache(start_dir=self.select_start_dir, cache_key='convert_to_vorbis')
 
         res = self.converter_obj.vorbis(file=file, quality_vbr=7, start_time='00:00:00')
 
@@ -1545,7 +1524,7 @@ class Youtube:
     def convert_to_aac(self):
         self.status = 'Статус'
 
-        file = self.open_file_with_cache(start_dir='c:/ProjectsMy/youtube/download', cache_key='convert_to_mp3')
+        file = self.open_file_with_cache(start_dir=self.select_start_dir, cache_key='convert_to_mp3')
 
         res = self.converter_obj.aac(file=file, start_time='00:00:00')
 
@@ -1619,6 +1598,10 @@ class Youtube:
             self.status = 'Ошибка'
 
         self.status = 'Ок'
+
+    def extract_audio_button(self):
+
+        self.status = 'Старт'
 
     def sound_error(self):
         self.status = 'Ошибка'
