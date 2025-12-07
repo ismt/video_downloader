@@ -29,6 +29,8 @@ from pymediainfo import MediaInfo
 
 import requests
 
+download_dir = Path(r'E:\Youtube_download')
+
 
 class TuneH264(enum.Enum):
     FILM = 0
@@ -117,7 +119,7 @@ class Converter:
 
         self.script_dir = Path(__file__).parent
 
-        self.select_start_dir = Path('c:/ProjectsMy/youtube/download')
+        self.select_start_dir = download_dir
 
         self.tmp_dir = self.script_dir / 'tmp'
 
@@ -187,9 +189,9 @@ class Converter:
             width: int = None,
             height: int = None,
             crf: int = 23,
-            start_time: Union[str,None] = '00:00:00',
-            end_time: Union[str,None] = None,
-            length_time: Union[str,None] = None,  # '00:00:00'
+            start_time: Union[str, None] = '00:00:00',
+            end_time: Union[str, None] = None,
+            length_time: Union[str, None] = None,  # '00:00:00'
             preset: PresetH264 = PresetH264.MEDIUM,
             copy_audio: bool = False,
             copy_video: bool = False,
@@ -245,6 +247,7 @@ class Converter:
 
         else:
             params += ['-c:v', 'libx264']
+            params += ['-movflags', '+faststart']
 
         """
         film– использовать для качественного киноконтента; снижает деблокировку
@@ -844,9 +847,9 @@ class Converter:
             width: int = None,
             height: int = None,
             crf: int = 23,
-            start_time: Union[str,None] = '00:00:00',
-            end_time: Union[str,None] = None,
-            length_time: Union[str,None] = None,  # '00:00:00'
+            start_time: Union[str, None] = '00:00:00',
+            end_time: Union[str, None] = None,
+            length_time: Union[str, None] = None,  # '00:00:00'
             preset: PresetH264 = PresetH264.MEDIUM,
             tune: TuneH264 = TuneH264.FILM,
     ):
@@ -995,7 +998,7 @@ class Youtube:
 
         self.tmp_dir = self.script_dir / 'tmp'
 
-        self.select_start_dir = Path('c:/ProjectsMy/youtube/download')
+        self.select_start_dir = download_dir
 
         self.cache = diskcache.Cache((self.tmp_dir / 'youtube_cache').as_posix())
 
