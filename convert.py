@@ -979,8 +979,8 @@ class Youtube:
         self.cookies_from_browser = cookies_from_browser
         self.proxy = proxy
 
-        self.file_name_format = Path('../download/%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s.%(ext)s')
-        self.file_name_format_audio = Path('../download/%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s audio.%(ext)s')
+        self.file_name_format = download_dir / '%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s.%(ext)s'
+        self.file_name_format_audio = download_dir / 'download/%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s audio.%(ext)s'
 
         self.yt_dlp_file = Path(__file__).parent / 'yt-dlp.exe'
 
@@ -1187,6 +1187,7 @@ class Youtube:
     def download_archive(
             self, height: int = 720,
             convert_to_mp4: bool = False,
+            text_out_obj = None,
     ):
 
         # https://github.com/yt-dlp/yt-dlp
@@ -1197,6 +1198,9 @@ class Youtube:
 
         if not isinstance(url, str) or not re.match(r'^http', url):
             self.sound_error()
+
+            if text_out_obj:
+                text_out_obj.insert(tkinter.END, 'Неправильный url' + "\n")
 
             raise ValueError('Неправильный url')
 
@@ -1282,22 +1286,22 @@ class Youtube:
         size_video_var = size_video.get()
 
         if size_video_var == '720':
-            self.download_archive(height=720, convert_to_mp4=convert_to_mp4)
+            self.download_archive(height=720, convert_to_mp4=convert_to_mp4, text_out_obj=self.text_output)
 
         elif size_video_var == '144':
-            self.download_archive(height=144, convert_to_mp4=convert_to_mp4)
+            self.download_archive(height=144, convert_to_mp4=convert_to_mp4, text_out_obj=self.text_output)
 
         elif size_video_var == '480':
-            self.download_archive(height=480, convert_to_mp4=convert_to_mp4)
+            self.download_archive(height=480, convert_to_mp4=convert_to_mp4, text_out_obj=self.text_output)
 
         elif size_video_var == '240':
-            self.download_archive(height=240, convert_to_mp4=convert_to_mp4)
+            self.download_archive(height=240, convert_to_mp4=convert_to_mp4, text_out_obj=self.text_output)
 
         elif size_video_var == '360':
-            self.download_archive(height=360, convert_to_mp4=convert_to_mp4)
+            self.download_archive(height=360, convert_to_mp4=convert_to_mp4, text_out_obj=self.text_output)
 
         elif size_video_var == '1080':
-            self.download_archive(height=1080, convert_to_mp4=convert_to_mp4)
+            self.download_archive(height=1080, convert_to_mp4=convert_to_mp4, text_out_obj=self.text_output)
 
         elif size_video_var == '3':
             self.create_link()
@@ -1341,7 +1345,7 @@ class Youtube:
         # params += ['--write-auto-subs']
         params += ['--force-overwrites']
 
-        params += ['-f', f'best']
+        # params += ['-f', f'best']
 
         params += ['-o', self.file_name_format]
 
