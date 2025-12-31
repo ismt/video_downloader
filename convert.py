@@ -29,7 +29,7 @@ from pymediainfo import MediaInfo
 
 import requests
 
-download_dir = Path(r'E:\Youtube_download')
+download_dir = Path(r'F:\Youtube_download')
 
 
 class TuneH264(enum.Enum):
