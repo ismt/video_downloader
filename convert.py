@@ -1,3 +1,4 @@
+import configparser
 import dataclasses
 import enum
 import os
@@ -29,6 +30,9 @@ from pymediainfo import MediaInfo
 
 import requests
 
+config = configparser.ConfigParser()
+config.read(Path(__file__).parent / 'config.ini')
+
 download_dir = Path(r'F:\Youtube_download')
 
 
@@ -52,6 +56,14 @@ class PresetH264(enum.Enum):
     SLOWER = 'SLOWER'
     VERYSLOW = 'VERYSLOW'
     PLACEBO = 'PLACEBO'
+
+
+def speech(msg: str):
+    if not config.has_option('macrodroid', 'uuid'):
+        return
+
+    uuid = config.get('macrodroid', 'uuid')
+    requests.get(f'https://trigger.macrodroid.com/{uuid}/msg?speech={msg}')
 
 
 def reader(stream, target, out_lines: list[str], out_obj: Any = None):
@@ -1187,7 +1199,7 @@ class Youtube:
     def download_archive(
             self, height: int = 720,
             convert_to_mp4: bool = False,
-            text_out_obj = None,
+            text_out_obj=None,
     ):
 
         # https://github.com/yt-dlp/yt-dlp
@@ -1630,7 +1642,7 @@ class Youtube:
 
 
 def sound_error():
-
+    speech('Ошибка ютуб обработки')
     winsound.Beep(500, 300)
     time.sleep(0.05)
 
@@ -1638,6 +1650,7 @@ def sound_error():
 
 
 def sound_ok():
+    speech('T')
     winsound.Beep(500, 300)
 
 
