@@ -1392,23 +1392,30 @@ class Youtube:
 
         width = None
 
+        crf = 23
+
         if height:
             if height == 144:
                 width = 256
 
             elif height == 240:
+                crf = 26
                 width = 426
 
             elif height == 360:
+                crf = 26
                 width = 640
 
             elif height == 480:
+                crf = 26
                 width = 854
 
             elif height == 720:
+                crf = 25
                 width = 1280
 
             elif height == 1080:
+                crf = 23
                 width = 1920
 
         track_video = self.converter_obj.get_video_media_info(file=file)
@@ -1416,7 +1423,7 @@ class Youtube:
         preset = PresetH264.VERYSLOW
         tune = TuneH264(TuneH264[tune])
         audio_bitrate_kilobit = 256
-        crf = 23
+
 
         if width is None:
             out_video = self.converter_obj.h264(
