@@ -146,6 +146,8 @@ class Converter:
 
     @validate_call()
     def exec_ffmpeg(self, args: list):
+        ttt=' '.join(str(i) for i in args)
+
         res = exec_command(args=args, out_obj=self.out_obj)
 
         return res
