@@ -25,3 +25,29 @@ requests = "^2.32.5"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+target-version = "py313"
+exclude = [
+    ".cache",
+    ".mypy_cache",
+    "venv",
+    "media",
+    "**/migrations",
+]
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "C4", "PERF", "ANN", "PLC"]
+ignore = ["C408", "ANN101", "ANN102", "F541"]
+
+[dependency-groups]
+dev = [
+    "ruff (>=0.15.16,<0.16.0)"
+]
