@@ -213,7 +213,6 @@ class Converter:
             audio_bitrate_kilobit: int = 192,
             fps: int = None,
             first_frame_image: Union[Path, str] = None,
-            hardware_encode: bool = False,
             # https://en.wikipedia.org/wiki/Advanced_Video_Coding#Decoded_picture_buffering
             h264_level: str = '3.2'
     ):
@@ -228,7 +227,7 @@ class Converter:
 
         start = time.monotonic()
 
-        out_file = rf'C:\Users\T\Videos\{file.stem}__{crf}_{width}_{height}-{tune.name}_{hardware_encode}.mp4'
+        out_file = rf'C:\Users\T\Videos\{file.stem}__{crf}_{width}_{height}-{tune.name}.mp4'
         out_file = Path(out_file)
         out_file_local = Path(self.tmp_dir / 'converted').with_suffix(out_file.suffix)
 
@@ -255,10 +254,6 @@ class Converter:
         if copy_video:
             params += ['-c:v', 'copy']
 
-        elif hardware_encode:
-            # params += ['-c:v', 'h264_amf']
-            params += ['-c:v', 'av1_amf']
-
         else:
             params += ['-c:v', 'libx264']
             params += ['-movflags', '+faststart']
@@ -271,17 +266,10 @@ class Converter:
         fastdecode- позволяет быстрее декодировать, отключив определенные фильтры
         zerolatency– подходит для быстрого кодирования и потоковой передачи с малой задержкой
         """
-        if not hardware_encode:
-            params += ['-tune', tune.name]
-            params += ['-crf', str(crf)]
-            params += ['-x264opts', 'opencl']
-            params += ['-preset', preset.name]
 
-        #
-        # fps_str = ''
-        #
-        # if fps:
-        #     params += ['-r', str(fps)]
+        params += ['-tune', tune.name]
+        params += ['-crf', str(crf)]
+        params += ['-preset', preset.name]
 
         if width:
             params += ['-vf', f'scale={width}:trunc(ow/a/2)*2:flags=lanczos']
@@ -916,7 +904,6 @@ class Converter:
         info = self.get_video_media_info(out_file)
 
         params += ['-c:a', 'flac']
-        params += ['-x264opts', 'opencl']
         params += ['-g', str(filter_float(info.frame_rate))]
         params += ['-level', '3.1']
         params += ['-pix_fmt', f'yuv420p']
