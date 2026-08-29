@@ -15,9 +15,12 @@ from tkinter import filedialog as fd
 
 import time
 
+import urllib.error
+import urllib.request
+
 from pydantic import validate_arguments
 
-from tkinter import Tk, ttk
+from tkinter import Tk, ttk, messagebox
 
 import tkinter
 
@@ -26,13 +29,39 @@ import diskcache
 from pymediainfo import MediaInfo
 
 
+YT_DLP_DOWNLOAD_URL: str = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe'
+
+FFMPEG_SEARCH_PATHS: tuple[Path, ...] = (
+    Path(r'C:\Users\work-\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-9.0.1-full_build\bin\ffmpeg.exe'),
+    Path(r'C:\ProgramData\chocolatey\lib\ffmpeg-full\tools\ffmpeg\bin\ffmpeg.exe'),
+    Path(r'C:\ProgramData\chocolatey\bin\ffmpeg.exe'),
+    Path(r'C:\ffmpeg\bin\ffmpeg.exe'),
+)
+
+
 class Converter:
 
-    def __init__(self):
+    def __init__(self) -> None:
 
         self.cache = diskcache.Cache('diskcache')
 
-        self.ffmpeg_file = Path(r'C:\ProgramData\chocolatey\lib\ffmpeg-full\tools\ffmpeg\bin\ffmpeg.exe')
+        self.ffmpeg_file = self.find_ffmpeg()
+
+    @staticmethod
+    def find_ffmpeg() -> Path:
+
+        for candidate_path in FFMPEG_SEARCH_PATHS:
+            if candidate_path.is_file():
+                return candidate_path
+
+        found_in_path = shutil.which('ffmpeg')
+
+        if found_in_path:
+            ffmpeg_path = Path(found_in_path)
+
+            return ffmpeg_path
+
+        raise FileNotFoundError(f'ffmpeg не найден. Проверь FFMPEG_SEARCH_PATHS или PATH: {FFMPEG_SEARCH_PATHS}')
 
     class TuneH264(enum.Enum):
         film = 0
@@ -69,12 +98,7 @@ class Converter:
         if out is not None:
             print(out.decode('utf-8', errors='replace'))
 
-        if err is not None:
-            print(err.decode('utf-8', errors='replace'))
-
-            return False
-
-        return True
+        return proc.returncode == 0
 
     @validate_arguments()
     def vp9(self, file: Path = None, width: int = None, crf: int = 23, vorbis_quality: int = 7):
@@ -1008,6 +1032,8 @@ class Youtube:
         if not isinstance(url, str) or not re.match(r'^http', url):
             self.sound_error()
 
+            messagebox.showerror('Ошибка', 'Неправильный url')
+
             raise ValueError('Неправильный url')
 
         params = []
@@ -1033,16 +1059,38 @@ class Youtube:
 
             self.sound_error()
 
+            messagebox.showerror('Ошибка', 'Ошибка скачивания')
+
             raise ValueError('Ошибка скачивания')
 
         self.status = 'Ок'
 
-    def update_yt_dlp(self):
+    def update_yt_dlp(self) -> None:
+        if not self.yt_dlp_file.is_file():
+            self.download_yt_dlp()
+
+            return
+
         params = []
 
         params += [self.yt_dlp_file, '-U']
 
         self.converter_obj.exec_ffmpeg(params)
+
+    def download_yt_dlp(self) -> None:
+        self.status = 'Скачивание yt-dlp'
+
+        try:
+            urllib.request.urlretrieve(YT_DLP_DOWNLOAD_URL, self.yt_dlp_file)
+
+        except urllib.error.URLError as error:
+            self.sound_error()
+
+            messagebox.showerror('Ошибка', f'Не удалось скачать yt-dlp: {error}')
+
+            raise
+
+        self.status = 'Ок'
 
     def create_link(self):
         initial_dir = Path('c:/ProjectsMy/youtube/download')
@@ -1118,6 +1166,8 @@ class Youtube:
         if not isinstance(url, str) or not re.match(r'^http', url):
             self.sound_error()
 
+            messagebox.showerror('Ошибка', 'Неправильный url')
+
             raise ValueError('Неправильный url')
 
         params = []
@@ -1142,6 +1192,8 @@ class Youtube:
 
         if not self.converter_obj.exec_ffmpeg(params):
             self.sound_error()
+
+            messagebox.showerror('Ошибка', 'Ошибка скачивания')
 
             raise ValueError('Ошибка скачивания')
 
@@ -1349,6 +1401,8 @@ class Youtube:
         if not isinstance(url, str) or not re.match(r'^http', url):
             self.sound_error()
 
+            messagebox.showerror('Ошибка', 'Неправильный url')
+
             raise ValueError('Неправильный url')
 
         params = []
@@ -1373,6 +1427,10 @@ class Youtube:
             self.sound_error()
 
             self.status = 'Ошибка'
+
+            messagebox.showerror('Ошибка', 'Ошибка скачивания')
+
+            return
 
         self.status = 'Ок'
 
