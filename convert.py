@@ -1,6 +1,5 @@
 import dataclasses
 import enum
-import os
 import re
 import shutil
 import subprocess
@@ -537,7 +536,7 @@ class Converter:
 
         params = []
 
-        params += [r'../ffmpeg/bin/ffmpeg.exe ']
+        params += [self.ffmpeg_file.as_posix() + ' ']
         # params += ['-i', file]
         params += ['-i', image]
         params += ['-y']
@@ -1040,7 +1039,7 @@ class Youtube:
 
         params += [self.yt_dlp_file, url]
 
-        params += ['--ffmpeg-location', '../ffmpeg/bin']
+        params += ['--ffmpeg-location', self.converter_obj.ffmpeg_file.parent.as_posix()]
 
         params += ['--embed-chapters']
         params += ['--yes-playlist']
@@ -1085,6 +1084,9 @@ class Youtube:
 
         except urllib.error.URLError as error:
             self.sound_error()
+
+            if self.yt_dlp_file.is_file():
+                self.yt_dlp_file.unlink()
 
             messagebox.showerror('Ошибка', f'Не удалось скачать yt-dlp: {error}')
 
@@ -1409,7 +1411,7 @@ class Youtube:
 
         params += [self.yt_dlp_file, url]
 
-        params += ['--ffmpeg-location', '../ffmpeg/bin']
+        params += ['--ffmpeg-location', self.converter_obj.ffmpeg_file.parent.as_posix()]
 
         params += ['--extract-audio']
         params += ['--force-overwrites']
