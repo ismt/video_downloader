@@ -6,10 +6,10 @@ authors = ["Your Name <you@example.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.9"
-pydantic = "^1.10.2"
+python = "^3.14"
+pydantic = "^2.13.5"
 diskcache = "^5.6.3"
-pymediainfo = "^6.1.0"
+pymediainfo = "^7.0.1"
 
 
 [build-system]

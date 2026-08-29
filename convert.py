@@ -6,7 +6,7 @@ import subprocess
 from operator import itemgetter
 
 from pathlib import Path
-from typing import Literal, Union
+from typing import Literal
 
 import winsound
 
@@ -17,7 +17,7 @@ import time
 import urllib.error
 import urllib.request
 
-from pydantic import validate_arguments
+from pydantic import validate_call
 
 from tkinter import Tk, ttk, messagebox
 
@@ -93,7 +93,7 @@ class Converter:
         out_file: Path
 
     @staticmethod
-    @validate_arguments()
+    @validate_call
     def exec_ffmpeg(args: list):
         proc = subprocess.Popen(args, stdout=subprocess.PIPE, shell=False)
 
@@ -129,8 +129,8 @@ class Converter:
 
         return proc.returncode == 0
 
-    @validate_arguments()
-    def vp9(self, file: Path = None, width: int = None, crf: int = 23, vorbis_quality: int = 7):
+    @validate_call
+    def vp9(self, file: Path | None = None, width: int | None = None, crf: int = 23, vorbis_quality: int = 7):
 
         if not file:
             file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
@@ -173,23 +173,23 @@ class Converter:
 
         self.exec_ffmpeg(params)
 
-    @validate_arguments()
+    @validate_call
     def h264(
             self,
-            file: Path = None,
-            width: int = None,
-            height: int = None,
+            file: Path | None = None,
+            width: int | None = None,
+            height: int | None = None,
             crf: int = 23,
-            start_time: str or None = '00:00:00',
-            end_time: str or None = None,
-            length_time: str or None = None,  # '00:00:00'
+            start_time: str | None = '00:00:00',
+            end_time: str | None = None,
+            length_time: str | None = None,  # '00:00:00'
             preset: PresetH264 = PresetH264.medium,
             copy_audio: bool = False,
             copy_video: bool = False,
             tune: TuneH264 = TuneH264.film,
             audio_bitrate_kilobit: int = 192,
-            fps: int = None,
-            first_frame_image: Union[Path, str] = None
+            fps: int | None = None,
+            first_frame_image: Path | str | None = None
     ):
 
         # https://trac.ffmpeg.org/wiki/Encode/H.264
@@ -372,15 +372,15 @@ class Converter:
 
         return out_file
 
-    @validate_arguments()
+    @validate_call
     def av1(
             self,
-            file: Path = None,
-            width: int = None,
-            height: int = None,
+            file: Path | None = None,
+            width: int | None = None,
+            height: int | None = None,
             crf: int = 23,
             audio_bitrate_kilobit: int = 192,
-            fps: int = None,
+            fps: int | None = None,
             lanczos: bool = True
     ):
 
@@ -442,15 +442,15 @@ class Converter:
 
         return out_file
 
-    @validate_arguments()
+    @validate_call
     def mp3(
             self,
-            file: Path = None,
+            file: Path | None = None,
             quality_vbr: int = 1,
             # audio_bitrate_kilobit: int = 192,
 
             start_time: str = '00:00:00',
-            end_time: str = None
+            end_time: str | None = None
     ):
         if not file:
             file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
@@ -491,13 +491,13 @@ class Converter:
 
         return self.ConvertResult(in_file=file, out_file=out_file)
 
-    @validate_arguments()
+    @validate_call
     def flac(
             self,
-            file: Path = None,
+            file: Path | None = None,
             compression_level: int = 12,
             start_time: str = '00:00:00',
-            end_time: str = None
+            end_time: str | None = None
     ):
         if not file:
             file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
@@ -545,7 +545,7 @@ class Converter:
 
         return self.ConvertResult(in_file=file, out_file=out_file)
 
-    def add_video_preview(self, file: Union[Path, str], image: Union[Path, str], width: int, height: int, fps: int, ):
+    def add_video_preview(self, file: Path | str, image: Path | str, width: int, height: int, fps: int, ):
 
         if not file:
             file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
@@ -582,8 +582,8 @@ class Converter:
 
         return out_file
 
-    @validate_arguments()
-    def extract_screenshot_from_video(self, out_file_image: Path, file: Path = None, start_time: str = '00:00:00', ):
+    @validate_call
+    def extract_screenshot_from_video(self, out_file_image: Path, file: Path | None = None, start_time: str = '00:00:00', ):
 
         if not file:
             file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
@@ -617,7 +617,7 @@ class Converter:
 
         return out_file
 
-    @validate_arguments()
+    @validate_call
     def to_size(
             self,
             max_size_bytes: int,
@@ -628,7 +628,7 @@ class Converter:
             start_height=50,
             preset: PresetH264 = PresetH264.medium,
             tune: TuneH264 = TuneH264.film,
-            fps: int = None
+            fps: int | None = None
     ):
 
         cache_item = self.cache.get('to_size_file_path')
@@ -689,7 +689,7 @@ class Converter:
 
         return True
 
-    @validate_arguments()
+    @validate_call
     def delogo(
             self,
             x: int,
@@ -697,9 +697,9 @@ class Converter:
             width: int,
             height: int,
             show_green_marker: Literal[0, 1],
-            file: Path = None,
+            file: Path | None = None,
             start_time: str = '00:00:00',
-            end_time: str = None,
+            end_time: str | None = None,
 
     ):
         if not file:
@@ -743,7 +743,7 @@ class Converter:
 
         return self.ConvertResult(in_file=file, out_file=out_file)
 
-    def get_video_media_info(self, file: Union[Path, str]):
+    def get_video_media_info(self, file: Path | str):
 
         media_info = MediaInfo.parse(filename=file)
 
@@ -751,21 +751,21 @@ class Converter:
 
         return track_video
 
-    @validate_arguments()
+    @validate_call
     def mkv_h264_pcm(
             self,
-            file: Path = None,
-            width: int = None,
-            height: int = None,
+            file: Path | None = None,
+            width: int | None = None,
+            height: int | None = None,
             crf: int = 23,
-            start_time: str or None = '00:00:00',
-            end_time: str or None = None,
-            length_time: str or None = None,  # '00:00:00'
+            start_time: str | None = '00:00:00',
+            end_time: str | None = None,
+            length_time: str | None = None,  # '00:00:00'
             preset: PresetH264 = PresetH264.medium,
             copy_audio: bool = False,
             copy_video: bool = False,
             tune: TuneH264 = TuneH264.film,
-            fps: int = None,
+            fps: int | None = None,
     ):
 
         # https://trac.ffmpeg.org/wiki/Encode/H.264
@@ -830,15 +830,15 @@ class Converter:
 
         shutil.move(out_file_local, out_file)
 
-    @validate_arguments()
+    @validate_call
     def vorbis(
             self,
-            file: Path = None,
+            file: Path | None = None,
             quality_vbr: int = 10,
             # audio_bitrate_kilobit: int = 192,
 
             start_time: str = '00:00:00',
-            end_time: str = None
+            end_time: str | None = None
     ):
         if not file:
             file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
@@ -1037,7 +1037,7 @@ class Youtube:
 
         self.root.mainloop()
 
-    @validate_arguments()
+    @validate_call
     def download_archive(self, height: int = 720, convert_to_mp4: bool = False):
         self.status = 'Старт'
 
@@ -1177,8 +1177,8 @@ class Youtube:
 
         self.status = 'Ок'
 
-    @validate_arguments()
-    def download_any(self, height: Union[int, str] = None):
+    @validate_call
+    def download_any(self, height: int | str | None = None):
 
         self.status = 'Старт'
 
@@ -1224,7 +1224,7 @@ class Youtube:
 
         sound_ok()
 
-    def convert_to_telegram(self, tune: str, height: Union[int, str] = None, start_time: str = '00:00:00', end_time: str = None):
+    def convert_to_telegram(self, tune: str, height: int | str | None = None, start_time: str = '00:00:00', end_time: str | None = None):
 
         file = self.open_file_with_cache(start_dir='c:/ProjectsMy/youtube/download', cache_key='convert_to_telegram')
 
@@ -1390,7 +1390,7 @@ class Youtube:
 
         sound_ok()
 
-    def open_file_with_cache(self, start_dir: Union[Path, str], cache_key: str):
+    def open_file_with_cache(self, start_dir: Path | str, cache_key: str):
 
         start_dir = Path(start_dir)
 
@@ -1415,7 +1415,7 @@ class Youtube:
 
         return file
 
-    @validate_arguments()
+    @validate_call
     def download_audio(self):
         self.status = 'Старт'
 
