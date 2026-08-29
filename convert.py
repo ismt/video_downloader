@@ -99,6 +99,31 @@ class Converter:
 
         return proc.returncode == 0
 
+    @staticmethod
+    def exec_with_progress(args: list, on_line=None):
+        proc = subprocess.Popen(
+            args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            shell=False,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            bufsize=1,
+        )
+
+        for line in proc.stdout:
+            line = line.strip('\r\n')
+
+            print(line)
+
+            if on_line and line:
+                on_line(line)
+
+        proc.wait()
+
+        return proc.returncode == 0
+
     @validate_arguments()
     def vp9(self, file: Path = None, width: int = None, crf: int = 23, vorbis_quality: int = 7):
 
@@ -1047,6 +1072,8 @@ class Youtube:
         params += ['--sub-langs', 'ru,en,ua,ja']
         params += ['--write-auto-subs']
         params += ['--force-overwrites']
+        params += ['--newline']
+        params += ['--progress']
 
         if convert_to_mp4:
             params += ['--recode-video', 'mp4']
@@ -1054,7 +1081,7 @@ class Youtube:
         params += ['-f', f'bestvideo[height<={height}]+bestaudio']
         params += ['-o', self.file_name_format]
 
-        if not self.converter_obj.exec_ffmpeg(params):
+        if not self.converter_obj.exec_with_progress(params, on_line=self.update_status_line):
 
             self.sound_error()
 
@@ -1184,6 +1211,8 @@ class Youtube:
         # params += ['--sub-langs', 'ru,en,ua,ja']
         # params += ['--write-auto-subs']
         params += ['--force-overwrites']
+        params += ['--newline']
+        params += ['--progress']
 
         if height:
             height = int(height)
@@ -1192,7 +1221,7 @@ class Youtube:
 
         params += ['-o', self.file_name_format]
 
-        if not self.converter_obj.exec_ffmpeg(params):
+        if not self.converter_obj.exec_with_progress(params, on_line=self.update_status_line):
             self.sound_error()
 
             messagebox.showerror('Ошибка', 'Ошибка скачивания')
@@ -1421,11 +1450,13 @@ class Youtube:
         params += ['--embed-subs']
         params += ['--sub-langs', 'ru,en,ua,ja']
         params += ['--write-auto-subs']
+        params += ['--newline']
+        params += ['--progress']
 
         params += ['-f', f'bestaudio']
         params += ['-o', self.file_name_format_audio]
 
-        if not self.converter_obj.exec_ffmpeg(params):
+        if not self.converter_obj.exec_with_progress(params, on_line=self.update_status_line):
             self.sound_error()
 
             self.status = 'Ошибка'
@@ -1435,6 +1466,9 @@ class Youtube:
             return
 
         self.status = 'Ок'
+
+    def update_status_line(self, line: str) -> None:
+        self.status = line[:120]
 
     def sound_error(self):
         self.status = 'Ошибка'
