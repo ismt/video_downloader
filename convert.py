@@ -37,6 +37,8 @@ FFMPEG_SEARCH_PATHS: tuple[Path, ...] = (
     Path(r'C:\ffmpeg\bin\ffmpeg.exe'),
 )
 
+VIDEOS_OUTPUT_DIR: Path = Path('data') / 'video'
+
 
 class Converter:
 
@@ -164,7 +166,7 @@ class Converter:
 
         params += ['-frame-parallel', '1']
 
-        params += [rf'C:\Users\T\Videos\{file.stem}_{crf}_{width}.webm']
+        params += [VIDEOS_OUTPUT_DIR / f'{file.stem}_{crf}_{width}.webm']
 
         self.exec_ffmpeg(params)
 
@@ -197,8 +199,7 @@ class Converter:
 
         start = time.monotonic()
 
-        out_file = rf'C:\Users\T\Videos\{file.stem}__{crf}_{width}_{height}-{tune.name}.mp4'
-        out_file = Path(out_file)
+        out_file = VIDEOS_OUTPUT_DIR / f'{file.stem}__{crf}_{width}_{height}-{tune.name}.mp4'
         out_file_local = Path('converted').with_suffix(out_file.suffix)
 
         if fps is None:
@@ -390,9 +391,7 @@ class Converter:
 
         start = time.monotonic()
 
-        out_file = rf'C:\Users\T\Videos\{file.stem}__{crf}_{width}_{height}.mkv'
-
-        out_file = Path(out_file)
+        out_file = VIDEOS_OUTPUT_DIR / f'{file.stem}__{crf}_{width}_{height}.mkv'
 
         params = []
 
@@ -456,9 +455,7 @@ class Converter:
 
         start = time.monotonic()
 
-        out_file = rf'C:\Users\T\Videos\{file.stem}__{quality_vbr}.mp3'
-
-        out_file = Path(out_file)
+        out_file = VIDEOS_OUTPUT_DIR / f'{file.stem}__{quality_vbr}.mp3'
 
         params = []
 
@@ -505,9 +502,7 @@ class Converter:
 
         start = time.monotonic()
 
-        out_file = rf'C:\Users\T\Videos\{file.stem}__{compression_level}.flac'
-
-        out_file = Path(out_file)
+        out_file = VIDEOS_OUTPUT_DIR / f'{file.stem}__{compression_level}.flac'
 
         params = []
 
@@ -599,7 +594,7 @@ class Converter:
 
         params += ['-ss', start_time]
         params += ['-frames:v', '1']
-        # params += ['-update', 'true']
+        params += ['-update', '1']
 
         out_file = out_file_image.with_suffix('.png')
 
@@ -710,9 +705,7 @@ class Converter:
 
         start = time.monotonic()
 
-        out_file = rf'C:\Users\T\Videos\{file.stem}.mkv'
-
-        out_file = Path(out_file)
+        out_file = VIDEOS_OUTPUT_DIR / f'{file.stem}.mkv'
 
         params = []
 
@@ -780,9 +773,7 @@ class Converter:
             file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
             file = Path(file)
 
-        out_file = rf'C:\Users\T\Videos\{file.stem}__{crf}_{width}_{height}-{tune.name}.mkv'
-
-        out_file = Path(out_file)
+        out_file = VIDEOS_OUTPUT_DIR / f'{file.stem}__{crf}_{width}_{height}-{tune.name}.mkv'
 
         out_file_local = Path('converted').with_suffix(out_file.suffix)
 
@@ -852,9 +843,7 @@ class Converter:
 
         start = time.monotonic()
 
-        out_file = rf'C:\Users\T\Videos\{file.stem}__{quality_vbr}.ogg'
-
-        out_file = Path(out_file)
+        out_file = VIDEOS_OUTPUT_DIR / f'{file.stem}__{quality_vbr}.ogg'
 
         params = []
 
@@ -1245,7 +1234,7 @@ class Youtube:
 
         if preview.as_posix() == '.':
             preview = self.converter_obj.extract_screenshot_from_video(
-                out_file_image=Path(rf'C:\Users\T\Videos\screenshot.png'),
+                out_file_image=VIDEOS_OUTPUT_DIR / 'screenshot.png',
                 file=file,
                 start_time=self.preview_time.get()
             )
@@ -1360,7 +1349,7 @@ class Youtube:
 
         self.converter_obj.extract_screenshot_from_video(
             file=res.in_file,
-            out_file_image=Path(r'C:\Users\T\Videos\screenshot.png'),
+            out_file_image=VIDEOS_OUTPUT_DIR / 'screenshot.png',
             start_time='00:00:03'
         )
 
@@ -1375,7 +1364,7 @@ class Youtube:
 
         self.converter_obj.extract_screenshot_from_video(
             file=res.in_file,
-            out_file_image=Path(r'C:\Users\T\Videos\screenshot.png'),
+            out_file_image=VIDEOS_OUTPUT_DIR / 'screenshot.png',
             start_time='00:00:03'
         )
 
@@ -1390,7 +1379,7 @@ class Youtube:
 
         self.converter_obj.extract_screenshot_from_video(
             file=res.in_file,
-            out_file_image=Path(r'C:\Users\T\Videos\screenshot.png'),
+            out_file_image=VIDEOS_OUTPUT_DIR / 'screenshot.png',
             start_time='00:00:03'
         )
 

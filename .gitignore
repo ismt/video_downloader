@@ -2,3 +2,9 @@
 /diskcache
 /ffmpeg2pass-0.log
 /yt-dlp.exe
+
+/data/*
+!/data/video
+/data/video/*
+!/data/video/.gitkeep
+/.claude
