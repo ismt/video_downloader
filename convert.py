@@ -39,6 +39,9 @@ FFMPEG_SEARCH_PATHS: tuple[Path, ...] = (
 
 VIDEOS_OUTPUT_DIR: Path = Path('data') / 'video'
 
+TEMP_DIR: Path = Path('data') / 'tmp'
+TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
 
 class Converter:
 
@@ -200,7 +203,7 @@ class Converter:
         start = time.monotonic()
 
         out_file = VIDEOS_OUTPUT_DIR / f'{file.stem}__{crf}_{width}_{height}-{tune.name}.mp4'
-        out_file_local = Path('converted').with_suffix(out_file.suffix)
+        out_file_local = (TEMP_DIR / 'converted').with_suffix(out_file.suffix)
 
         if fps is None:
             video_info = self.get_video_media_info(file)
@@ -283,12 +286,12 @@ class Converter:
 
             video_info = self.get_video_media_info(out_file_local)
 
-            tmp_mp4 = Path('tmp_preview_video.mp4')
+            tmp_mp4 = TEMP_DIR / 'tmp_preview_video.mp4'
 
             out_file_with_preview = out_file_local.with_name('video_with_preview.mp4')
 
-            input1 = Path('input1.ts')
-            input2 = Path('input2.ts')
+            input1 = TEMP_DIR / 'input1.ts'
+            input2 = TEMP_DIR / 'input2.ts'
 
             params = []
 
@@ -313,7 +316,7 @@ class Converter:
             params = []
 
             params += [self.ffmpeg_file.as_posix() + ' ']
-            params += ['-i', tmp_mp4.name]
+            params += ['-i', tmp_mp4]
             params += ['-y']
             params += ['-c', 'copy']
             params += [input1]
@@ -328,7 +331,7 @@ class Converter:
             params = []
 
             params += [self.ffmpeg_file.as_posix() + ' ']
-            params += ['-i', out_file_local.name]
+            params += ['-i', out_file_local]
             params += ['-y']
             params += ['-c', 'copy']
 
@@ -344,7 +347,7 @@ class Converter:
             params = []
 
             params += [self.ffmpeg_file.as_posix() + ' ']
-            params += ['-i', f'concat:{input1.name}|{input2.name}']
+            params += ['-i', f'concat:{input1.as_posix()}|{input2.as_posix()}']
             params += ['-y']
             params += ['-c', 'copy']
 
@@ -775,7 +778,7 @@ class Converter:
 
         out_file = VIDEOS_OUTPUT_DIR / f'{file.stem}__{crf}_{width}_{height}-{tune.name}.mkv'
 
-        out_file_local = Path('converted').with_suffix(out_file.suffix)
+        out_file_local = (TEMP_DIR / 'converted').with_suffix(out_file.suffix)
 
         params = []
 
