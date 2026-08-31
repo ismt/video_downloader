@@ -42,6 +42,9 @@ VIDEOS_OUTPUT_DIR: Path = Path('data') / 'video'
 TEMP_DIR: Path = Path('data') / 'tmp'
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
+DOWNLOAD_DIR: Path = Path('data') / 'download'
+DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
 
 class Converter:
 
@@ -133,7 +136,7 @@ class Converter:
     def vp9(self, file: Path | None = None, width: int | None = None, crf: int = 23, vorbis_quality: int = 7):
 
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
             file = Path(file)
 
         self.exec_ffmpeg(
@@ -197,7 +200,7 @@ class Converter:
         # https://github.com/rdp/ffmpeg-windows-build-helpers
 
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
             file = Path(file)
 
         start = time.monotonic()
@@ -389,7 +392,7 @@ class Converter:
         # https://github.com/rdp/ffmpeg-windows-build-helpers
 
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
             file = Path(file)
 
         start = time.monotonic()
@@ -453,7 +456,7 @@ class Converter:
             end_time: str | None = None
     ):
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
             file = Path(file)
 
         start = time.monotonic()
@@ -500,7 +503,7 @@ class Converter:
             end_time: str | None = None
     ):
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
             file = Path(file)
 
         start = time.monotonic()
@@ -548,10 +551,10 @@ class Converter:
     def add_video_preview(self, file: Path | str, image: Path | str, width: int, height: int, fps: int, ):
 
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
 
         if not image:
-            image = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            image = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
 
         file = Path(file)
 
@@ -586,7 +589,7 @@ class Converter:
     def extract_screenshot_from_video(self, out_file_image: Path, file: Path | None = None, start_time: str = '00:00:00', ):
 
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
             file = Path(file)
 
         params = []
@@ -634,7 +637,7 @@ class Converter:
         cache_item = self.cache.get('to_size_file_path')
 
         if not cache_item:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
 
         else:
             file = fd.askopenfilename(initialdir=cache_item)
@@ -703,7 +706,7 @@ class Converter:
 
     ):
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
             file = Path(file)
 
         start = time.monotonic()
@@ -773,7 +776,7 @@ class Converter:
         # https://github.com/rdp/ffmpeg-windows-build-helpers
 
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
             file = Path(file)
 
         out_file = VIDEOS_OUTPUT_DIR / f'{file.stem}__{crf}_{width}_{height}-{tune.name}.mkv'
@@ -841,7 +844,7 @@ class Converter:
             end_time: str | None = None
     ):
         if not file:
-            file = fd.askopenfilename(initialdir='c:/ProjectsMy/youtube/download')
+            file = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
             file = Path(file)
 
         start = time.monotonic()
@@ -881,8 +884,8 @@ class Converter:
 
 class Youtube:
     def __init__(self):
-        self.file_name_format = '../download/%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s.%(ext)s'
-        self.file_name_format_audio = '../download/%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s audio.%(ext)s'
+        self.file_name_format = f'{DOWNLOAD_DIR.as_posix()}/%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s.%(ext)s'
+        self.file_name_format_audio = f'{DOWNLOAD_DIR.as_posix()}/%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s audio.%(ext)s'
 
         self.yt_dlp_file = Path('./yt-dlp.exe')
 
@@ -892,7 +895,16 @@ class Youtube:
 
         self.root = self.tkinter_root
 
-        self.root.geometry('500x750')
+        window_width = 500
+        window_height = 750
+
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+
+        position_x = (screen_width - window_width) // 2
+        position_y = (screen_height - window_height) // 2
+
+        self.root.geometry(f'{window_width}x{window_height}+{position_x}+{position_y}')
 
         self.root.resizable(False, False)
 
@@ -1063,6 +1075,7 @@ class Youtube:
         params += ['--embed-subs']
         params += ['--sub-langs', 'ru,en,ua,ja']
         params += ['--write-auto-subs']
+        params += ['--ignore-errors']
         params += ['--force-overwrites']
         params += ['--newline']
         params += ['--progress']
@@ -1114,7 +1127,7 @@ class Youtube:
         self.status = 'Ок'
 
     def create_link(self):
-        initial_dir = Path('c:/ProjectsMy/youtube/download')
+        initial_dir = DOWNLOAD_DIR
 
         len_initial_dir_parts = len(initial_dir.parts)
 
@@ -1124,7 +1137,7 @@ class Youtube:
 
             # source = Path(*source.parts[len_initial_dir_parts:])
 
-            if target := fd.askdirectory(initialdir='c:/ProjectsMy/youtube/download', title='В какую папку ссылка'):
+            if target := fd.askdirectory(initialdir=DOWNLOAD_DIR.as_posix(), title='В какую папку ссылка'):
 
                 target = Path(target)
 
@@ -1226,14 +1239,14 @@ class Youtube:
 
     def convert_to_telegram(self, tune: str, height: int | str | None = None, start_time: str = '00:00:00', end_time: str | None = None):
 
-        file = self.open_file_with_cache(start_dir='c:/ProjectsMy/youtube/download', cache_key='convert_to_telegram')
+        file = self.open_file_with_cache(start_dir=DOWNLOAD_DIR.as_posix(), cache_key='convert_to_telegram')
 
         if file.as_posix() == '.':
             self.sound_error()
 
             return
 
-        preview = self.open_file_with_cache(start_dir='c:/ProjectsMy/youtube/download', cache_key='convert_to_telegram_preview')
+        preview = self.open_file_with_cache(start_dir=DOWNLOAD_DIR.as_posix(), cache_key='convert_to_telegram_preview')
 
         if preview.as_posix() == '.':
             preview = self.converter_obj.extract_screenshot_from_video(

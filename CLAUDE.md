@@ -30,7 +30,7 @@ These paths are baked into the code, not configurable via CLI args or env vars �
 
 - `Converter.ffmpeg_file` is resolved by `Converter.find_ffmpeg()` at construction time: it checks each path in the module-level `FFMPEG_SEARCH_PATHS` tuple, falls back to `shutil.which('ffmpeg')` (PATH lookup), and raises `FileNotFoundError` if none exist. Add new known install locations to `FFMPEG_SEARCH_PATHS` rather than hardcoding a path elsewhere. `Youtube.download_archive`/`download_audio` pass this resolved path to yt-dlp's `--ffmpeg-location` (a stale relative literal there used to make yt-dlp warn and skip ffmpeg post-processing — fixed).
 - `yt_dlp_file` = `./yt-dlp.exe` — gitignored, not checked in. `Youtube.update_yt_dlp` downloads it fresh from `YT_DLP_DOWNLOAD_URL` (GitHub latest release) if missing, otherwise runs its built-in `-U` self-update.
-- Download target dir: `c:/ProjectsMy/youtube/download` (used as the file-picker `initialdir` and in `file_name_format`/`file_name_format_audio`, both `../download/...`).
+- Download target dir: `DOWNLOAD_DIR` module constant (`data/download`, relative to the repo root, gitignored, created on import) — used as the file-picker `initialdir` and in `file_name_format`/`file_name_format_audio`.
 - Conversion output dir: `C:\Users\T\Videos\...`.
 
 When editing conversion/download logic, keep new output paths consistent with these existing conventions rather than introducing a third convention.
