@@ -152,12 +152,16 @@ class Converter:
     @staticmethod
     @validate_call
     def exec_ffmpeg(args: list):
-        proc = subprocess.Popen(args, stdout=subprocess.PIPE, shell=False)
+        proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
 
         (out, err) = proc.communicate()
 
         if out is not None:
-            print(out.decode('utf-8', errors='replace'))
+            text = out.decode('utf-8', errors='replace')
+
+            print(text)
+
+            log_conversion(f'ffmpeg output:\n{text}')
 
         return proc.returncode == 0
 
