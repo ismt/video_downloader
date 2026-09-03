@@ -1354,6 +1354,10 @@ class Youtube:
 
     def convert_to_telegram(self, tune: str, height: int | str | None = None, start_time: str = '00:00:00', end_time: str | None = None):
 
+        self.status = 'Старт'
+
+        start = time.monotonic()
+
         file = self.open_file_with_cache(start_dir=DOWNLOAD_DIR.as_posix(), cache_key='convert_to_telegram')
 
         if file.as_posix() == '.':
@@ -1440,7 +1444,13 @@ class Youtube:
 
         sound_ok()
 
+        self.status = f'Ок ({time.monotonic() - start:.1f}s)'
+
     def convert_fast(self):
+        self.status = 'Старт'
+
+        start = time.monotonic()
+
         # self.converter_obj.to_size(
         #     max_size_bytes=25000000000000 * 1024 * 1024,
         #     crf=23,
@@ -1473,8 +1483,12 @@ class Youtube:
 
         sound_ok()
 
+        self.status = f'Ок ({time.monotonic() - start:.1f}s)'
+
     def convert_to_mp3(self):
-        self.status = 'Статус'
+        self.status = 'Старт'
+
+        start = time.monotonic()
 
         res = self.converter_obj.mp3(quality_vbr=0, start_time='00:00:00')
 
@@ -1486,10 +1500,12 @@ class Youtube:
 
         sound_ok()
 
-        self.status = 'Ок'
+        self.status = f'Ок ({time.monotonic() - start:.1f}s)'
 
     def convert_to_vorbis(self):
-        self.status = 'Статус'
+        self.status = 'Старт'
+
+        start = time.monotonic()
 
         res = self.converter_obj.vorbis(quality_vbr=7, start_time='00:00:00')
 
@@ -1501,10 +1517,12 @@ class Youtube:
 
         sound_ok()
 
-        self.status = 'Ок'
+        self.status = f'Ок ({time.monotonic() - start:.1f}s)'
 
     def convert_to_flac(self):
-        self.status = 'Статус'
+        self.status = 'Старт'
+
+        start = time.monotonic()
 
         res = self.converter_obj.flac(compression_level=12, start_time='00:00:00')
 
@@ -1514,9 +1532,9 @@ class Youtube:
             start_time='00:00:03'
         )
 
-        self.status = 'Ок'
-
         sound_ok()
+
+        self.status = f'Ок ({time.monotonic() - start:.1f}s)'
 
     def open_file_with_cache(self, start_dir: Path | str, cache_key: str):
 
