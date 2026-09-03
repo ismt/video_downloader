@@ -869,7 +869,7 @@ class Converter:
 
         info = self.get_video_media_info(file)
 
-        params += ['-c:a', 'flac']
+        params += ['-c:a', 'pcm_s16le']
 
         if not gpu_encoder:
             params += ['-x264opts', 'opencl']
