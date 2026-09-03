@@ -57,6 +57,16 @@ TEMP_DIR.mkdir(parents=True, exist_ok=True)
 DOWNLOAD_DIR: Path = Path('data') / 'download'
 DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+LOGS_DIR: Path = Path('data') / 'logs'
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def log_conversion(line: str) -> None:
+    timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+
+    with open(LOGS_DIR / 'conversion.log', 'a', encoding='utf-8') as log_file:
+        log_file.write(f'{timestamp} {line}\n')
+
 
 class Converter:
 
@@ -813,6 +823,7 @@ class Converter:
             copy_video: bool = False,
             tune: TuneH264 = TuneH264.film,
             fps: int | None = None,
+            use_gpu: bool = False,
     ):
 
         # https://trac.ffmpeg.org/wiki/Encode/H.264
@@ -842,7 +853,7 @@ class Converter:
         if length_time:
             params += ['-t', length_time]
 
-        gpu_encoder = self.detect_gpu_h264_encoder()
+        gpu_encoder = self.detect_gpu_h264_encoder() if use_gpu else None
 
         if gpu_encoder:
             encoder_name, extra_args_template = gpu_encoder
@@ -869,7 +880,8 @@ class Converter:
 
         info = self.get_video_media_info(file)
 
-        params += ['-c:a', 'pcm_s16le']
+        params += ['-c:a', 'libmp3lame']
+        params += ['-q:a', '4']
 
         if not gpu_encoder:
             params += ['-x264opts', 'opencl']
@@ -882,12 +894,26 @@ class Converter:
 
         print(params)
 
-        if not self.exec_ffmpeg(params):
+        encoder_used = gpu_encoder[0] if gpu_encoder else 'libx264'
+
+        start = time.monotonic()
+
+        success = self.exec_ffmpeg(params)
+
+        elapsed = time.monotonic() - start
+
+        if not success:
+            log_conversion(f'FAIL file={file.name} encoder={encoder_used} crf={crf} elapsed={elapsed:.1f}s')
+
             sound_error()
 
             raise ValueError()
 
         shutil.move(out_file_local, out_file)
+
+        log_conversion(
+            f'OK file={file.name} encoder={encoder_used} crf={crf} elapsed={elapsed:.1f}s out={out_file.name}'
+        )
 
     @validate_call
     def vorbis(
@@ -1429,7 +1455,7 @@ class Youtube:
         #
         # )
         self.converter_obj.mkv_h264_pcm(
-            crf=23,
+            crf=30,
             # start_time='02:20:00',
             # end_time='02:30:00',
             # height=144,
