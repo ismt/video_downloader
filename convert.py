@@ -1,8 +1,10 @@
 import dataclasses
 import enum
+import queue
 import re
 import shutil
 import subprocess
+import threading
 from operator import itemgetter
 
 from pathlib import Path
@@ -37,6 +39,16 @@ FFMPEG_SEARCH_PATHS: tuple[Path, ...] = (
     Path(r'C:\ffmpeg\bin\ffmpeg.exe'),
 )
 
+# Приоритет: NVIDIA -> Intel -> AMD. Каждый шаблон флагов проверяется тестовым
+# кодированием целиком (не только наличие энкодера в списке ffmpeg -encoders),
+# чтобы отсеять энкодеры, которые формально есть, но не инициализируются на
+# данном железе/драйвере.
+GPU_H264_ENCODERS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ('h264_nvenc', ('-rc', 'constqp', '-qp', '{crf}')),
+    ('h264_qsv', ('-global_quality', '{crf}')),
+    ('h264_amf', ('-quality', 'quality', '-rc', 'cqp', '-qp_i', '{crf}', '-qp_p', '{crf}')),
+)
+
 VIDEOS_OUTPUT_DIR: Path = Path('data') / 'video'
 
 TEMP_DIR: Path = Path('data') / 'tmp'
@@ -69,6 +81,38 @@ class Converter:
             return ffmpeg_path
 
         raise FileNotFoundError(f'ffmpeg не найден. Проверь FFMPEG_SEARCH_PATHS или PATH: {FFMPEG_SEARCH_PATHS}')
+
+    def detect_gpu_h264_encoder(self) -> tuple[str, tuple[str, ...]] | None:
+
+        if hasattr(self, '_gpu_h264_encoder_cache'):
+            return self._gpu_h264_encoder_cache
+
+        for encoder_name, extra_args_template in GPU_H264_ENCODERS:
+            extra_args = [arg.format(crf=23) for arg in extra_args_template]
+
+            works = self.exec_ffmpeg(
+                [
+                    self.ffmpeg_file.as_posix() + ' ',
+                    '-hide_banner',
+                    '-loglevel', 'error',
+                    '-f', 'lavfi',
+                    '-i', 'testsrc=duration=0.5:size=320x240:rate=10',
+                    '-frames:v', '5',
+                    '-c:v', encoder_name,
+                    *extra_args,
+                    '-pix_fmt', 'yuv420p',
+                    '-f', 'null', '-',
+                ]
+            )
+
+            if works:
+                self._gpu_h264_encoder_cache = (encoder_name, extra_args_template)
+
+                return self._gpu_h264_encoder_cache
+
+        self._gpu_h264_encoder_cache = None
+
+        return None
 
     class TuneH264(enum.Enum):
         film = 0
@@ -779,7 +823,7 @@ class Converter:
             file = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
             file = Path(file)
 
-        out_file = VIDEOS_OUTPUT_DIR / f'{file.stem}__{crf}_{width}_{height}-{tune.name}.mkv'
+        out_file = VIDEOS_OUTPUT_DIR / f'{file.stem}_fast.mkv'
 
         out_file_local = (TEMP_DIR / 'converted').with_suffix(out_file.suffix)
 
@@ -798,12 +842,21 @@ class Converter:
         if length_time:
             params += ['-t', length_time]
 
-        params += ['-c:v', 'libx264']
+        gpu_encoder = self.detect_gpu_h264_encoder()
 
-        params += ['-tune', tune.name]
+        if gpu_encoder:
+            encoder_name, extra_args_template = gpu_encoder
 
-        params += ['-crf', str(crf)]
-        params += ['-preset', preset.name]
+            params += ['-c:v', encoder_name]
+            params += [arg.format(crf=crf) for arg in extra_args_template]
+
+        else:
+            params += ['-c:v', 'libx264']
+
+            params += ['-tune', tune.name]
+
+            params += ['-crf', str(crf)]
+            params += ['-preset', preset.name]
 
         if width:
             params += ['-vf', f'scale={width}:-1:flags=lanczos']
@@ -814,10 +867,13 @@ class Converter:
         if fps:
             params += ['-filter:v', f'fps={fps}']
 
-        info = self.get_video_media_info(out_file)
+        info = self.get_video_media_info(file)
 
         params += ['-c:a', 'flac']
-        params += ['-x264opts', 'opencl']
+
+        if not gpu_encoder:
+            params += ['-x264opts', 'opencl']
+
         params += ['-g', str(filter_float(info.frame_rate))]
         params += ['-level', '3.1']
         params += ['-pix_fmt', f'yuv420p']
@@ -1047,7 +1103,55 @@ class Youtube:
 
         self.status = None
 
+        self._status_queue = queue.Queue()
+
+        self.root.after(100, self._poll_status_queue)
+
         self.root.mainloop()
+
+    def _poll_status_queue(self) -> None:
+        try:
+            while True:
+                kind, payload = self._status_queue.get_nowait()
+
+                if kind == 'status':
+                    self.label_status.config(text=payload)
+
+                elif kind == 'done':
+                    ok, error_message = payload
+
+                    if ok:
+                        self.label_status.config(text='Ок')
+
+                        sound_ok()
+
+                    else:
+                        self.label_status.config(text='Ошибка')
+
+                        sound_error()
+
+                        messagebox.showerror('Ошибка', error_message)
+
+        except queue.Empty:
+            pass
+
+        self.label_status.update_idletasks()
+
+        self.root.after(100, self._poll_status_queue)
+
+    def _run_download_in_thread(self, params: list) -> None:
+        def worker():
+            try:
+                ok = self.converter_obj.exec_with_progress(params, on_line=self.update_status_line)
+
+            except Exception as error:
+                self._status_queue.put(('done', (False, str(error))))
+
+                return
+
+            self._status_queue.put(('done', (ok, 'Ошибка скачивания')))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     @validate_call
     def download_archive(self, height: int = 720, convert_to_mp4: bool = False):
@@ -1086,15 +1190,7 @@ class Youtube:
         params += ['-f', f'bestvideo[height<={height}]+bestaudio']
         params += ['-o', self.file_name_format]
 
-        if not self.converter_obj.exec_with_progress(params, on_line=self.update_status_line):
-
-            self.sound_error()
-
-            messagebox.showerror('Ошибка', 'Ошибка скачивания')
-
-            raise ValueError('Ошибка скачивания')
-
-        self.status = 'Ок'
+        self._run_download_in_thread(params)
 
     def update_yt_dlp(self) -> None:
         if not self.yt_dlp_file.is_file():
@@ -1176,6 +1272,10 @@ class Youtube:
         elif size_video_var == '3':
             self.create_link()
 
+            sound_ok()
+
+            self.status = 'Ок'
+
         elif size_video_var == '1':
             self.download_archive(height=1080, convert_to_mp4=convert_to_mp4)
 
@@ -1183,12 +1283,6 @@ class Youtube:
             self.sound_error()
 
             raise ValueError('Не найдено значение для меню')
-
-        # self.download_audio()
-
-        sound_ok()
-
-        self.status = 'Ок'
 
     @validate_call
     def download_any(self, height: int | str | None = None):
@@ -1226,16 +1320,7 @@ class Youtube:
 
         params += ['-o', self.file_name_format]
 
-        if not self.converter_obj.exec_with_progress(params, on_line=self.update_status_line):
-            self.sound_error()
-
-            messagebox.showerror('Ошибка', 'Ошибка скачивания')
-
-            raise ValueError('Ошибка скачивания')
-
-        self.status = 'Ок'
-
-        sound_ok()
+        self._run_download_in_thread(params)
 
     def convert_to_telegram(self, tune: str, height: int | str | None = None, start_time: str = '00:00:00', end_time: str | None = None):
 
@@ -1461,19 +1546,10 @@ class Youtube:
         params += ['-f', f'bestaudio']
         params += ['-o', self.file_name_format_audio]
 
-        if not self.converter_obj.exec_with_progress(params, on_line=self.update_status_line):
-            self.sound_error()
-
-            self.status = 'Ошибка'
-
-            messagebox.showerror('Ошибка', 'Ошибка скачивания')
-
-            return
-
-        self.status = 'Ок'
+        self._run_download_in_thread(params)
 
     def update_status_line(self, line: str) -> None:
-        self.status = line[:120]
+        self._status_queue.put(('status', line[:120]))
 
     def sound_error(self):
         self.status = 'Ошибка'
