@@ -51,6 +51,9 @@ GPU_H264_ENCODERS: tuple[tuple[str, tuple[str, ...]], ...] = (
 
 VIDEOS_OUTPUT_DIR: Path = Path('data') / 'video'
 
+AUDIO_OUTPUT_DIR: Path = Path('data') / 'audio-convert'
+AUDIO_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
 TEMP_DIR: Path = Path('data') / 'tmp'
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -519,7 +522,7 @@ class Converter:
 
         start = time.monotonic()
 
-        out_file = VIDEOS_OUTPUT_DIR / f'{file.stem}__{quality_vbr}.mp3'
+        out_file = AUDIO_OUTPUT_DIR / f'{file.stem}__{quality_vbr}.mp3'
 
         params = []
 
@@ -566,7 +569,7 @@ class Converter:
 
         start = time.monotonic()
 
-        out_file = VIDEOS_OUTPUT_DIR / f'{file.stem}__{compression_level}.flac'
+        out_file = AUDIO_OUTPUT_DIR / f'{file.stem}__{compression_level}.flac'
 
         params = []
 
@@ -935,7 +938,7 @@ class Converter:
 
         start = time.monotonic()
 
-        out_file = VIDEOS_OUTPUT_DIR / f'{file.stem}__{quality_vbr}.ogg'
+        out_file = AUDIO_OUTPUT_DIR / f'{file.stem}__{quality_vbr}.ogg'
 
         params = []
 
@@ -1100,6 +1103,14 @@ class Youtube:
             self.root,
             text="Конвертация быстро",
             command=self.convert_fast
+        )
+
+        button.pack(fill='x', padx=padx, pady=pady)
+
+        button = ttk.Button(
+            self.root,
+            text="Конвертация MP3",
+            command=lambda: self.convert_to_mp3()
         )
 
         button.pack(fill='x', padx=padx, pady=pady)
@@ -1490,13 +1501,7 @@ class Youtube:
 
         start = time.monotonic()
 
-        res = self.converter_obj.mp3(quality_vbr=0, start_time='00:00:00')
-
-        self.converter_obj.extract_screenshot_from_video(
-            file=res.in_file,
-            out_file_image=VIDEOS_OUTPUT_DIR / 'screenshot.png',
-            start_time='00:00:03'
-        )
+        self.converter_obj.mp3(quality_vbr=0, start_time='00:00:00')
 
         sound_ok()
 
@@ -1507,13 +1512,7 @@ class Youtube:
 
         start = time.monotonic()
 
-        res = self.converter_obj.vorbis(quality_vbr=7, start_time='00:00:00')
-
-        self.converter_obj.extract_screenshot_from_video(
-            file=res.in_file,
-            out_file_image=VIDEOS_OUTPUT_DIR / 'screenshot.png',
-            start_time='00:00:03'
-        )
+        self.converter_obj.vorbis(quality_vbr=7, start_time='00:00:00')
 
         sound_ok()
 
@@ -1524,13 +1523,7 @@ class Youtube:
 
         start = time.monotonic()
 
-        res = self.converter_obj.flac(compression_level=12, start_time='00:00:00')
-
-        self.converter_obj.extract_screenshot_from_video(
-            file=res.in_file,
-            out_file_image=VIDEOS_OUTPUT_DIR / 'screenshot.png',
-            start_time='00:00:03'
-        )
+        self.converter_obj.flac(compression_level=12, start_time='00:00:00')
 
         sound_ok()
 
