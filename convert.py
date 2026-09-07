@@ -510,7 +510,7 @@ class Converter:
     def mp3(
             self,
             file: Path | None = None,
-            quality_vbr: int = 1,
+            quality_vbr: int = 0,
             # audio_bitrate_kilobit: int = 192,
 
             start_time: str = '00:00:00',
