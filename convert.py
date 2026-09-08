@@ -64,11 +64,11 @@ LOGS_DIR: Path = Path('data') / 'logs'
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def log_conversion(line: str) -> None:
+def log_conversion(line: str, log_file: str = 'conversion.log') -> None:
     timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
 
-    with open(LOGS_DIR / 'conversion.log', 'a', encoding='utf-8') as log_file:
-        log_file.write(f'{timestamp} {line}\n')
+    with open(LOGS_DIR / log_file, 'a', encoding='utf-8') as log_file_handle:
+        log_file_handle.write(f'{timestamp} {line}\n')
 
 
 class Converter:
@@ -154,7 +154,7 @@ class Converter:
 
     @staticmethod
     @validate_call
-    def exec_ffmpeg(args: list):
+    def exec_ffmpeg(args: list, log_file: str = 'conversion.log'):
         proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
 
         (out, err) = proc.communicate()
@@ -164,7 +164,7 @@ class Converter:
 
             print(text)
 
-            log_conversion(f'ffmpeg output:\n{text}')
+            log_conversion(f'ffmpeg output:\n{text}', log_file=log_file)
 
         return proc.returncode == 0
 
@@ -253,7 +253,8 @@ class Converter:
             tune: TuneH264 = TuneH264.film,
             audio_bitrate_kilobit: int = 192,
             fps: int | None = None,
-            first_frame_image: Path | str | None = None
+            first_frame_image: Path | str | None = None,
+            log_file: str = 'conversion.log'
     ):
 
         # https://trac.ffmpeg.org/wiki/Encode/H.264
@@ -341,7 +342,7 @@ class Converter:
 
         print(params)
 
-        if not self.exec_ffmpeg(params):
+        if not self.exec_ffmpeg(params, log_file=log_file):
             sound_error()
 
             raise ValueError()
@@ -1424,7 +1425,8 @@ class Youtube:
                 file=file,
                 first_frame_image=preview,
                 start_time=start_time,
-                end_time=end_time
+                end_time=end_time,
+                log_file='convert-to-telegram.log'
             )
 
         else:
@@ -1437,7 +1439,8 @@ class Youtube:
                     file=file,
                     first_frame_image=preview,
                     start_time=start_time,
-                    end_time=end_time
+                    end_time=end_time,
+                    log_file='convert-to-telegram.log'
                 )
 
             else:
@@ -1450,7 +1453,8 @@ class Youtube:
                     file=file,
                     first_frame_image=preview,
                     start_time=start_time,
-                    end_time=end_time
+                    end_time=end_time,
+                    log_file='convert-to-telegram.log'
                 )
 
         sound_ok()
