@@ -32,8 +32,11 @@ from pymediainfo import MediaInfo
 
 YT_DLP_DOWNLOAD_URL: str = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe'
 
+WINGET_FFMPEG_PACKAGE_DIR: Path = (
+    Path.home() / 'AppData' / 'Local' / 'Microsoft' / 'WinGet' / 'Packages' / 'Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe'
+)
+
 FFMPEG_SEARCH_PATHS: tuple[Path, ...] = (
-    Path(r'C:\Users\work-\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-9.0.1-full_build\bin\ffmpeg.exe'),
     Path(r'C:\ProgramData\chocolatey\lib\ffmpeg-full\tools\ffmpeg\bin\ffmpeg.exe'),
     Path(r'C:\ProgramData\chocolatey\bin\ffmpeg.exe'),
     Path(r'C:\ffmpeg\bin\ffmpeg.exe'),
@@ -82,7 +85,17 @@ class Converter:
     @staticmethod
     def find_ffmpeg() -> Path:
 
-        for candidate_path in FFMPEG_SEARCH_PATHS:
+        """
+        Winget puts ffmpeg into a versioned folder (ffmpeg-X.Y.Z-full_build), so the version
+        is globbed; the newest folder wins.
+        """
+        winget_candidates: list[Path] = sorted(
+            WINGET_FFMPEG_PACKAGE_DIR.glob('ffmpeg-*-full_build/bin/ffmpeg.exe'),
+            key=lambda path: [int(part) if part.isdigit() else 0 for part in re.split(r'\D+', path.parts[-3])],
+            reverse=True,
+        )
+
+        for candidate_path in (*winget_candidates, *FFMPEG_SEARCH_PATHS):
             if candidate_path.is_file():
                 return candidate_path
 
