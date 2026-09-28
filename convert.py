@@ -66,6 +66,8 @@ DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 LOGS_DIR: Path = Path('data') / 'logs'
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
+TELEGRAM_HEIGHTS: tuple[int, ...] = (144, 240, 360, 480, 720, 1080)
+
 
 def log_conversion(line: str, log_file: str = 'conversion.log') -> None:
     timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
@@ -331,7 +333,8 @@ class Converter:
             params += ['-vf', f'scale={width}:-1:flags=lanczos']
 
         elif height:
-            params += ['-vf', f'scale={-1}:{height}:flags=lanczos']
+            # -2: libx264 с yuv420p требует чётную ширину, -1 может дать нечётную
+            params += ['-vf', f'scale=-2:{height}:flags=lanczos']
 
         if copy_audio:
             params += ['-c:a', 'copy']
@@ -1401,74 +1404,32 @@ class Youtube:
 
         height = int(height)
 
-        width = None
-
-        if height:
-            if height == 144:
-                width = 256
-
-            elif height == 240:
-                width = 426
-
-            elif height == 360:
-                width = 640
-
-            elif height == 480:
-                width = 854
-
-            elif height == 720:
-                width = 1280
-
-            elif height == 1080:
-                width = 1920
-
         track_video = self.converter_obj.get_video_media_info(file=file)
+
+        """
+        Масштаб по высоте, а не по ширине из таблицы 16:9: у видео уже 16:9 (вертикальные, 4:3) сравнение
+        по ширине пропускало уменьшение или давало другую высоту. Прочие значения меню (1 — «не указывать»)
+        конвертируются без масштабирования.
+        """
+        target_height = height if height in TELEGRAM_HEIGHTS and height < track_video.height else None
 
         preset = self.converter_obj.PresetH264.veryslow
         tune = self.converter_obj.TuneH264[tune]
         audio_bitrate_kilobit = 196
         crf = 24
 
-        if width is None:
-            out_video = self.converter_obj.h264(
-                crf=crf,
-                preset=preset,
-                tune=tune,
-                audio_bitrate_kilobit=audio_bitrate_kilobit,
-                file=file,
-                first_frame_image=preview,
-                start_time=start_time,
-                end_time=end_time,
-                log_file='convert-to-telegram.log'
-            )
-
-        else:
-            if width >= track_video.width:
-                out_video = self.converter_obj.h264(
-                    crf=crf,
-                    preset=preset,
-                    tune=tune,
-                    audio_bitrate_kilobit=audio_bitrate_kilobit,
-                    file=file,
-                    first_frame_image=preview,
-                    start_time=start_time,
-                    end_time=end_time,
-                    log_file='convert-to-telegram.log'
-                )
-
-            else:
-                out_video = self.converter_obj.h264(
-                    crf=crf,
-                    width=width,
-                    preset=preset,
-                    tune=tune,
-                    audio_bitrate_kilobit=audio_bitrate_kilobit,
-                    file=file,
-                    first_frame_image=preview,
-                    start_time=start_time,
-                    end_time=end_time,
-                    log_file='convert-to-telegram.log'
-                )
+        self.converter_obj.h264(
+            crf=crf,
+            height=target_height,
+            preset=preset,
+            tune=tune,
+            audio_bitrate_kilobit=audio_bitrate_kilobit,
+            file=file,
+            first_frame_image=preview,
+            start_time=start_time,
+            end_time=end_time,
+            log_file='convert-to-telegram.log'
+        )
 
         sound_ok()
 
