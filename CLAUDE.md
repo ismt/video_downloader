@@ -20,6 +20,7 @@ poetry run python convert.py
 ## Checking changes
 
 - Static check that does not start the app: `poetry run python -m py_compile convert.py`.
+- With no ruff config in the repo, ruff runs with an external rule set; `convert.py` passes it except `I001` on `import diskcache`. That one is a false positive: ruff takes the cache folder `diskcache/` in the repo root for a first-party package. Keep `diskcache` among third-party imports.
 - Never `import convert` to check something: the module ends with `youtube = Youtube()`, so importing it opens the window and blocks until it closes; the import also creates the `data/*` dirs. `Converter` cannot be exercised without the GUI for the same reason.
 - `.claude/settings.json` denies `Read`/`Edit` of `./data/**` (user media and logs). ffmpeg/yt-dlp output goes to the console and to `data/logs/` — to debug a failure, ask the user to paste the relevant log lines instead of reading them.
 
@@ -28,7 +29,7 @@ poetry run python convert.py
 Top to bottom:
 
 1. **Module constants** — `YT_DLP_DOWNLOAD_URL`, `WINGET_FFMPEG_PACKAGE_DIR`, `FFMPEG_SEARCH_PATHS`, `GPU_H264_ENCODERS`, the `data/` dirs (see «Files and directories»), `TELEGRAM_HEIGHTS`; helper `log_conversion`.
-2. **`Converter`** — ffmpeg wrapper, no widgets of its own (but its methods open `filedialog` when `file` is not passed). Encoding methods: `h264`, `mkv_h264_pcm`, `av1`, `vp9`, `delogo`, `to_size`, `mp3`, `flac`, `vorbis`, `extract_screenshot_from_video`, `add_video_preview`. Infrastructure: `find_ffmpeg`, `detect_gpu_h264_encoder`, `exec_ffmpeg`, `exec_with_progress`, `get_video_media_info` (first video track from `pymediainfo`), nested `TuneH264`/`PresetH264` enums (libx264 `-tune`/`-preset` values) and the `ConvertResult` dataclass.
+2. **`Converter`** — ffmpeg wrapper, no widgets of its own (but its methods open `filedialog` when `file` is not passed). Encoding methods: `h264`, `mkv_h264_pcm`, `av1`, `vp9`, `delogo`, `to_size`, `mp3`, `flac`, `vorbis`, `extract_screenshot_from_video`, `add_video_preview`. Infrastructure: `find_ffmpeg`, `detect_gpu_h264_encoder`, `exec_ffmpeg`, `exec_with_progress`, `get_video_media_info` (first video track from `pymediainfo`), `get_audio_media_info` (first audio track or `None`), nested `TuneH264`/`PresetH264` enums (libx264 `-tune`/`-preset` values) and the `ConvertResult` dataclass.
 3. **`Youtube`** — builds the whole UI imperatively in `__init__` and ends it with `self.root.mainloop()`, so constructing `Youtube()` blocks until the window closes. Download methods (`download_archive`, `download_any`, `download_audio`, `update_yt_dlp`, `download_yt_dlp`), conversion handlers (`convert_to_telegram`, `convert_fast`, `convert_to_mp3`, `convert_to_vorbis`, `convert_to_flac`), `create_link`, `open_file_with_cache`, status plumbing.
 4. **Module helpers** — `sound_error`, `sound_ok`, `filter_float` (MediaInfo returns frame rate as a string, possibly with a decimal comma).
 
@@ -43,20 +44,21 @@ Radio buttons set `selected_size` (a `StringVar`): heights `1080`…`144`, `1` =
 | «Скачать ютуб» | `exec_button` → `download_archive` | yt-dlp `bestvideo[height<=H]+bestaudio`, subs, chapters, playlists; `1` = cap 1080; `3` = `create_link` (symlink via two pickers) | `data/download/` |
 | «Скачать ютуб аудио» | `download_audio` | yt-dlp `bestaudio --extract-audio` | `data/download/` |
 | «Скачать ролик с любого хостнга» | `download_any` | yt-dlp `best[height=H]` (exact height) | `data/download/` |
-| «Конвертация Телеграм» | `convert_to_telegram` | `Converter.h264`: crf 24, `veryslow`, tune from the combobox, trim from «Начало видео»/«Конец видео», preview frame | `data/video/*.mp4` |
+| «Конвертация Телеграм» | `convert_to_telegram` | `Converter.h264`: crf 24, `veryslow`, `lookahead_threads=5`, tune from the combobox, trim from «Начало видео»/«Конец видео», preview image overlaid on frame 0; AAC audio copied, other codecs → AAC 256k | `data/video/*.mp4` |
 | «Конвертация быстро» | `convert_fast` | `Converter.mkv_h264_pcm(crf=30, ultrafast)` | `data/video/<stem>_fast.mkv` |
 | «Конвертация MP3/Vorbis/FLAC» | `convert_to_mp3` / `convert_to_vorbis` / `convert_to_flac` | `Converter.mp3` / `vorbis` / `flac` | `data/audio-convert/` |
 | «Обновить yt-dlp» | `update_yt_dlp` | download if missing, else `yt-dlp -U` | `./yt-dlp.exe` |
 
 - Entries «Время для превью» (`preview_time`), «Начало видео» (`edit_start_video_time`), «Конец видео» (`edit_end_video_time`) and the tune combobox are used only by `convert_to_telegram`.
 - `convert_to_telegram` asks for the video, then for a preview image; cancelling the second picker extracts a frame at `preview_time`. It scales only when the chosen height is in `TELEGRAM_HEIGHTS` and below the source height.
+- The preview replaces the first frame (`overlay=enable='eq(n,0)'` in `-filter_complex`), it is not prepended: duration and timestamps match the source, so audio is not shifted. With a preview `h264` maps `[v]` and `0:a:0?` explicitly — only the first audio track goes to the output, subtitles are dropped. `copy_video` together with a preview raises `ValueError`.
 - `vp9`, `av1`, `delogo`, `to_size`, `add_video_preview` are not wired to any control. They are run by temporarily editing the body of `convert_fast` (its commented-out calls show this usage).
 - URL input comes from the clipboard (`self.tkinter_root.clipboard_get()`, must start with `http`), not a text field: copy a video URL, then click a download button.
 - Adding a control: `ttk.Button(self.root, ...)` + `.pack(fill='x', padx=padx, pady=pady)` in `__init__` before `mainloop()`. The window is fixed at 500×750 and not resizable — new widgets may end up below the visible area; raise `window_height` when adding.
 
 ## Threading and status
 
-- Downloads run in a daemon thread (`_run_download_in_thread` → `Converter.exec_with_progress`, which streams yt-dlp lines). The worker never touches widgets: it puts `('status', text)` / `('done', (ok, error_message))` into `self._status_queue`; `_poll_status_queue` applies them on the Tk thread every 100 ms and beeps / shows a `messagebox` on `done`.
+- Downloads run in a daemon thread (`_run_download_in_thread` → `_download_worker` → `Converter.exec_with_progress`, which streams yt-dlp lines). The worker never touches widgets: it puts `('status', text)` / `('done', (ok, error_message))` into `self._status_queue`; `_poll_status_queue` applies them on the Tk thread every 100 ms and beeps / shows a `messagebox` on `done`.
 - Conversions run synchronously on the Tk thread — the window freezes until ffmpeg exits. To make a long operation non-blocking, reuse the queue pattern above.
 - The `status` property setter writes to `label_status` directly — call it only from the Tk thread.
 - An exception raised inside a button callback does not close the app: Tk prints the traceback to the console and the status label stays at «Старт». Watch the console when testing.
@@ -70,7 +72,7 @@ All relative to the current working directory:
 | `data/download/` | `DOWNLOAD_DIR` | yt-dlp output (`file_name_format`, `file_name_format_audio`), default `initialdir` of file pickers |
 | `data/video/` | `VIDEOS_OUTPUT_DIR` | video conversions; not created by code — exists through the tracked `data/video/.gitkeep` |
 | `data/audio-convert/` | `AUDIO_OUTPUT_DIR` | audio conversions |
-| `data/tmp/` | `TEMP_DIR` | intermediate files (`converted.<ext>`, preview `.ts` parts) |
+| `data/tmp/` | `TEMP_DIR` | intermediate files (`converted.<ext>`) |
 | `data/logs/` | `LOGS_DIR` | `conversion.log` (output of `exec_ffmpeg` calls, OK/FAIL lines of `mkv_h264_pcm`), `convert-to-telegram.log` (main encode of `convert_to_telegram`) |
 | `diskcache/` | `diskcache.Cache('diskcache')` | last-used file/dir per picker |
 | `yt-dlp.exe` | `Youtube.yt_dlp_file` | gitignored; downloaded from `YT_DLP_DOWNLOAD_URL` |
@@ -91,8 +93,11 @@ All relative to the current working directory:
 - Run through `exec_ffmpeg` (synchronous, returns `bool`, prints and logs output). For line-by-line progress use `exec_with_progress(args, on_line=...)`.
 - Shape of a `Converter` method: `@validate_call`; `file: Path | None = None`, falling back to `fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())`; output into one of the `*_OUTPUT_DIR` constants; `-y`; `print(params)`; on failure `sound_error()` then `raise ValueError(...)`; return `ConvertResult(in_file=..., out_file=...)` (audio methods, `delogo`; the rest still return a bare `Path` or nothing).
 - `@validate_call` coerces arguments at call time, so pass enum members (`self.converter_obj.PresetH264.veryslow`); a name from the GUI goes through `TuneH264[name]`.
-- Write to `TEMP_DIR / 'converted'` + suffix first and `shutil.move` to the final path only on success (as `mkv_h264_pcm` does), so a failed run leaves no partial file at the destination. The temp name is fixed — safe only while conversions run one at a time; running them in threads needs unique temp names.
-- `-ss`/`-to` are placed after `-i` (output seeking): frame-accurate, but ffmpeg decodes from the start of the file.
+- Every function has parameter and return type annotations — keep it that way. `@validate_call` checks arguments only (`validate_return` is off), so a return annotation never changes behaviour, but annotating a previously bare parameter of a `@validate_call` method does: it starts being validated and coerced.
+- libx264 parallelism: with `veryslow` the single-threaded lookahead is the bottleneck (x264 gives it threads/6 threads), and x264 itself caps frame threads by frame height (11 at 360p). `h264(lookahead_threads=N)` adds `-x264-params lookahead-threads=N`; x264 clips N to what the height allows (2 at 144p, 3 at 240p). `-x264opts opencl` is a no-op on this laptop: x264 logs «OpenCL acceleration disabled, switchable graphics detected».
+- AAC encoding uses ffmpeg's native `aac` with its default `twoloop` coder; do not add `-aac_coder fast` (it leaves spectral holes at 8–16 kHz). When the source audio is already AAC, prefer `-c:a copy` (`h264(copy_audio=True)`).
+- Write to `TEMP_DIR / 'converted'` + suffix first and `shutil.move` to the final path only on success (as `h264` and `mkv_h264_pcm` do), so a failed run leaves no partial file at the destination. The temp name is fixed — safe only while conversions run one at a time; running them in threads needs unique temp names.
+- `-ss`/`-to` are placed after `-i` (output seeking): frame-accurate, but ffmpeg decodes from the start of the file. Exception: `h264` puts them before `-i` (input seeking) — the trim then happens before the filters, so `n=0` in its preview overlay is the first output frame; when transcoding, input seeking is frame-accurate too.
 - One `-vf` per command: ffmpeg keeps only the last `-vf`/`-filter:v`, so combine filters with a comma (`scale=...,fps=...`). Scale with `-2` for the free dimension (`scale=-2:{height}`): libx264 with `yuv420p` rejects odd sizes.
 - Error signalling: the tool has no other user-facing failure signal, so keep it. `Converter` uses the module-level `sound_error()` (two beeps) / `sound_ok()` (one beep); `Youtube` has its own `self.sound_error()`, which also sets the status to «Ошибка».
 - UI strings and code comments are in Russian; this file and `README.md` are in English.

@@ -5,35 +5,28 @@ import re
 import shutil
 import subprocess
 import threading
-from operator import itemgetter
-
-from pathlib import Path
-from typing import Literal
-
-import winsound
-
-from tkinter import filedialog as fd
-
 import time
-
+import tkinter
 import urllib.error
 import urllib.request
-
-from pydantic import validate_call
-
-from tkinter import Tk, ttk, messagebox
-
-import tkinter
+import winsound
+from collections.abc import Callable
+from operator import itemgetter
+from pathlib import Path
+from tkinter import Tk, messagebox, ttk
+from tkinter import filedialog as fd
+from typing import Literal
 
 import diskcache
-
-from pymediainfo import MediaInfo
+from pydantic import validate_call
+from pymediainfo import MediaInfo, Track
 
 
 YT_DLP_DOWNLOAD_URL: str = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe'
 
 WINGET_FFMPEG_PACKAGE_DIR: Path = (
-    Path.home() / 'AppData' / 'Local' / 'Microsoft' / 'WinGet' / 'Packages' / 'Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe'
+    Path.home() / 'AppData' / 'Local' / 'Microsoft' / 'WinGet' / 'Packages'
+    / 'Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe'
 )
 
 FFMPEG_SEARCH_PATHS: tuple[Path, ...] = (
@@ -169,7 +162,7 @@ class Converter:
 
     @staticmethod
     @validate_call
-    def exec_ffmpeg(args: list, log_file: str = 'conversion.log'):
+    def exec_ffmpeg(args: list, log_file: str = 'conversion.log') -> bool:
         proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
 
         (out, err) = proc.communicate()
@@ -184,7 +177,7 @@ class Converter:
         return proc.returncode == 0
 
     @staticmethod
-    def exec_with_progress(args: list, on_line=None):
+    def exec_with_progress(args: list, on_line: Callable[[str], None] | None = None) -> bool:
         proc = subprocess.Popen(
             args,
             stdout=subprocess.PIPE,
@@ -209,7 +202,7 @@ class Converter:
         return proc.returncode == 0
 
     @validate_call
-    def vp9(self, file: Path | None = None, width: int | None = None, crf: int = 23, vorbis_quality: int = 7):
+    def vp9(self, file: Path | None = None, width: int | None = None, crf: int = 23, vorbis_quality: int = 7) -> None:
 
         if not file:
             file = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
@@ -269,8 +262,9 @@ class Converter:
             audio_bitrate_kilobit: int = 192,
             fps: int | None = None,
             first_frame_image: Path | str | None = None,
-            log_file: str = 'conversion.log'
-    ):
+            log_file: str = 'conversion.log',
+            lookahead_threads: int | None = None
+    ) -> Path:
 
         # https://trac.ffmpeg.org/wiki/Encode/H.264
 
@@ -282,20 +276,27 @@ class Converter:
 
         start = time.monotonic()
 
+        if first_frame_image and copy_video:
+            sound_error()
+
+            raise ValueError('Превью накладывается на первый кадр, с copy_video это невозможно')
+
         out_file = VIDEOS_OUTPUT_DIR / f'{file.stem}__{crf}_{width}_{height}-{tune.name}.mp4'
         out_file_local = (TEMP_DIR / 'converted').with_suffix(out_file.suffix)
 
+        video_info = self.get_video_media_info(file)
+
         if fps is None:
-            video_info = self.get_video_media_info(file)
             fps = filter_float(video_info.frame_rate)
-            fps = float(fps)
 
         params = []
 
         params += [self.ffmpeg_file.as_posix() + ' ']
-        params += ['-i', file]
-        params += ['-y']
 
+        """
+        -ss/-to/-t стоят перед -i (поиск по входу): обрезка идёт до фильтров, поэтому кадр n=0 в overlay —
+        первый кадр результата. При перекодировании такой поиск тоже точный до кадра.
+        """
         if start_time:
             params += ['-ss', start_time]
 
@@ -304,6 +305,13 @@ class Converter:
 
         if length_time:
             params += ['-t', length_time]
+
+        params += ['-i', file]
+
+        if first_frame_image:
+            params += ['-i', first_frame_image]
+
+        params += ['-y']
 
         if copy_video:
             params += ['-c:v', 'copy']
@@ -323,18 +331,56 @@ class Converter:
 
         params += ['-crf', str(crf)]
         params += ['-preset', preset.name]
+
+        if lookahead_threads and not copy_video:
+            """
+            По умолчанию x264 даёт lookahead threads/6 потоков (при 360p — 1), и он тормозит кодирование.
+            Больше потоков — быстрее (5 при 360p: −29% времени), качество ниже менее чем на 0.1 дБ SSIM.
+            Значение выше допустимого для высоты кадра x264 урезает сам.
+            """
+            params += ['-x264-params', f'lookahead-threads={lookahead_threads}']
+
         #
         # fps_str = ''
         #
         # if fps:
         #     params += ['-r', str(fps)]
 
+        scale_filter = None
+
         if width:
-            params += ['-vf', f'scale={width}:-1:flags=lanczos']
+            scale_filter = f'scale={width}:-1:flags=lanczos'
 
         elif height:
             # -2: libx264 с yuv420p требует чётную ширину, -1 может дать нечётную
-            params += ['-vf', f'scale=-2:{height}:flags=lanczos']
+            scale_filter = f'scale=-2:{height}:flags=lanczos'
+
+        if first_frame_image:
+            """
+            Превью заменяет первый кадр, а не вставляется перед видео: длительность и отметки времени
+            совпадают с исходником, звук не сдвигается. Картинка растягивается до размера исходного кадра
+            до масштабирования, затем масштабируется вместе с видео.
+            """
+            source_width, source_height = video_info.width, video_info.height
+
+            if video_info.rotation and round(float(video_info.rotation)) % 180 == 90:
+                source_width, source_height = source_height, source_width
+
+            filter_complex = (
+                f'[1:v]scale={source_width}:{source_height}:flags=lanczos[preview];'
+                f"[0:v][preview]overlay=enable='eq(n,0)'"
+            )
+
+            if scale_filter:
+                filter_complex += f',{scale_filter}'
+
+            filter_complex += '[v]'
+
+            params += ['-filter_complex', filter_complex]
+            params += ['-map', '[v]', '-map', '0:a:0?']
+
+        elif scale_filter:
+            params += ['-vf', scale_filter]
 
         if copy_audio:
             params += ['-c:a', 'copy']
@@ -343,8 +389,8 @@ class Converter:
             params += ['-c:a', 'aac']
             params += ['-b:a', f'{audio_bitrate_kilobit}k']
 
+            # кодер по умолчанию twoloop: -aac_coder fast давал спектральные провалы на 8–16 кГц
             params += ['-cutoff', '22000']
-            params += ['-aac_coder', 'fast']
 
         params += ['-x264opts', 'opencl']
         params += ['-g', f'{fps * 2}']
@@ -363,91 +409,7 @@ class Converter:
 
             raise ValueError()
 
-        if first_frame_image:
-
-            video_info = self.get_video_media_info(out_file_local)
-
-            tmp_mp4 = TEMP_DIR / 'tmp_preview_video.mp4'
-
-            out_file_with_preview = out_file_local.with_name('video_with_preview.mp4')
-
-            input1 = TEMP_DIR / 'input1.ts'
-            input2 = TEMP_DIR / 'input2.ts'
-
-            params = []
-
-            params += [self.ffmpeg_file.as_posix() + ' ']
-            params += ['-i', first_frame_image]
-            params += ['-y']
-            params += ['-c:v', 'libx264']
-            params += ['-pix_fmt', f'yuv420p']
-            params += ['-s', f'{video_info.width}x{video_info.height}']
-            params += ['-t', '0.02']
-            params += ['-r', video_info.frame_rate]
-
-            params += [tmp_mp4]
-
-            print(params)
-
-            if not self.exec_ffmpeg(params):
-                sound_error()
-
-                raise ValueError()
-
-            params = []
-
-            params += [self.ffmpeg_file.as_posix() + ' ']
-            params += ['-i', tmp_mp4]
-            params += ['-y']
-            params += ['-c', 'copy']
-            params += [input1]
-
-            print(params)
-
-            if not self.exec_ffmpeg(params):
-                sound_error()
-
-                raise ValueError()
-
-            params = []
-
-            params += [self.ffmpeg_file.as_posix() + ' ']
-            params += ['-i', out_file_local]
-            params += ['-y']
-            params += ['-c', 'copy']
-
-            params += [input2]
-
-            print(params)
-
-            if not self.exec_ffmpeg(params):
-                sound_error()
-
-                raise ValueError()
-
-            params = []
-
-            params += [self.ffmpeg_file.as_posix() + ' ']
-            params += ['-i', f'concat:{input1.as_posix()}|{input2.as_posix()}']
-            params += ['-y']
-            params += ['-c', 'copy']
-
-            params += [out_file_with_preview]
-
-            print(params)
-
-            if not self.exec_ffmpeg(params):
-                sound_error()
-
-                raise ValueError()
-
-            tmp_mp4.unlink()
-            input1.unlink()
-            input2.unlink()
-
-            shutil.move(out_file_with_preview, out_file)
-
-        out_file_local.unlink()
+        shutil.move(out_file_local, out_file)
 
         print(f'Ok время {time.monotonic() - start}')
 
@@ -463,7 +425,7 @@ class Converter:
             audio_bitrate_kilobit: int = 192,
             fps: int | None = None,
             lanczos: bool = True
-    ):
+    ) -> Path:
 
         # https://trac.ffmpeg.org/wiki/Encode/H.264
 
@@ -532,7 +494,7 @@ class Converter:
 
             start_time: str = '00:00:00',
             end_time: str | None = None
-    ):
+    ) -> ConvertResult:
         if not file:
             file = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
             file = Path(file)
@@ -579,7 +541,7 @@ class Converter:
             compression_level: int = 12,
             start_time: str = '00:00:00',
             end_time: str | None = None
-    ):
+    ) -> ConvertResult:
         if not file:
             file = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
             file = Path(file)
@@ -626,7 +588,7 @@ class Converter:
 
         return self.ConvertResult(in_file=file, out_file=out_file)
 
-    def add_video_preview(self, file: Path | str, image: Path | str, width: int, height: int, fps: int, ):
+    def add_video_preview(self, file: Path | str, image: Path | str, width: int, height: int, fps: int, ) -> Path:
 
         if not file:
             file = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
@@ -664,7 +626,12 @@ class Converter:
         return out_file
 
     @validate_call
-    def extract_screenshot_from_video(self, out_file_image: Path, file: Path | None = None, start_time: str = '00:00:00', ):
+    def extract_screenshot_from_video(
+            self,
+            out_file_image: Path,
+            file: Path | None = None,
+            start_time: str = '00:00:00',
+    ) -> Path:
 
         if not file:
             file = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
@@ -702,15 +669,15 @@ class Converter:
     def to_size(
             self,
             max_size_bytes: int,
-            crf=23,
-            test_original=False,
-            start_time='00:00:00',
-            end_time=None,
-            start_height=50,
+            crf: int = 23,
+            test_original: bool = False,
+            start_time: str = '00:00:00',
+            end_time: str | None = None,
+            start_height: int = 50,
             preset: PresetH264 = PresetH264.medium,
             tune: TuneH264 = TuneH264.film,
             fps: int | None = None
-    ):
+    ) -> bool:
 
         cache_item = self.cache.get('to_size_file_path')
 
@@ -725,7 +692,9 @@ class Converter:
         self.cache.set('to_size_file_path', file.parent.as_posix())
 
         if test_original:
-            out_file = self.h264(file=file, crf=crf, start_time=start_time, end_time=end_time, preset=preset, tune=tune, fps=fps)
+            out_file = self.h264(
+                file=file, crf=crf, start_time=start_time, end_time=end_time, preset=preset, tune=tune, fps=fps
+            )
 
             if out_file.stat().st_size < max_size_bytes:
                 return True
@@ -734,18 +703,22 @@ class Converter:
 
         height_inc = 8
 
-        last_size_file = 0
-
         for i in range(0, 1000):
 
             height = start_height + i * height_inc
 
             print(f'Высота {height}')
 
-            out_file = self.h264(file=file, height=height, crf=crf, start_time=start_time, end_time=end_time, preset=preset, tune=tune, fps=fps)
-
-            if out_file.stat().st_size > 0:
-                last_size_file = out_file.stat().st_size
+            out_file = self.h264(
+                file=file,
+                height=height,
+                crf=crf,
+                start_time=start_time,
+                end_time=end_time,
+                preset=preset,
+                tune=tune,
+                fps=fps
+            )
 
             size_file = out_file.stat().st_size
 
@@ -782,7 +755,7 @@ class Converter:
             start_time: str = '00:00:00',
             end_time: str | None = None,
 
-    ):
+    ) -> ConvertResult:
         if not file:
             file = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
             file = Path(file)
@@ -824,13 +797,21 @@ class Converter:
 
         return self.ConvertResult(in_file=file, out_file=out_file)
 
-    def get_video_media_info(self, file: Path | str):
+    def get_video_media_info(self, file: Path | str) -> Track:
 
         media_info = MediaInfo.parse(filename=file)
 
         track_video = next(i for i in media_info.tracks if i.track_type.casefold() == 'Video'.casefold())
 
         return track_video
+
+    def get_audio_media_info(self, file: Path | str) -> Track | None:
+        # первая аудиодорожка; None, если звука в файле нет
+        media_info = MediaInfo.parse(filename=file)
+
+        track_audio = next((i for i in media_info.tracks if i.track_type.casefold() == 'Audio'.casefold()), None)
+
+        return track_audio
 
     @validate_call
     def mkv_h264_pcm(
@@ -848,7 +829,7 @@ class Converter:
             tune: TuneH264 = TuneH264.film,
             fps: int | None = None,
             use_gpu: bool = False,
-    ):
+    ) -> None:
 
         # https://trac.ffmpeg.org/wiki/Encode/H.264
 
@@ -948,7 +929,7 @@ class Converter:
 
             start_time: str = '00:00:00',
             end_time: str | None = None
-    ):
+    ) -> ConvertResult:
         if not file:
             file = fd.askopenfilename(initialdir=DOWNLOAD_DIR.as_posix())
             file = Path(file)
@@ -989,9 +970,11 @@ class Converter:
 
 
 class Youtube:
-    def __init__(self):
-        self.file_name_format = f'{DOWNLOAD_DIR.as_posix()}/%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s.%(ext)s'
-        self.file_name_format_audio = f'{DOWNLOAD_DIR.as_posix()}/%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s audio.%(ext)s'
+    def __init__(self) -> None:
+        file_name_template = '%(title)s -- %(uploader)s -- %(webpage_url)s -- %(upload_date)s'
+
+        self.file_name_format = f'{DOWNLOAD_DIR.as_posix()}/{file_name_template}.%(ext)s'
+        self.file_name_format_audio = f'{DOWNLOAD_DIR.as_posix()}/{file_name_template} audio.%(ext)s'
 
         self.yt_dlp_file = Path('./yt-dlp.exe')
 
@@ -1110,7 +1093,7 @@ class Youtube:
         self.edit_end_video_time.insert(0, '08:00:00')
         self.edit_end_video_time.pack(fill='x', padx=padx, pady=pady)
 
-        tune = ttk.Combobox(self.root, values=list(i.name for i in self.converter_obj.TuneH264))
+        tune = ttk.Combobox(self.root, values=[i.name for i in self.converter_obj.TuneH264])
 
         tune.current(0)
 
@@ -1198,21 +1181,22 @@ class Youtube:
         self.root.after(100, self._poll_status_queue)
 
     def _run_download_in_thread(self, params: list) -> None:
-        def worker():
-            try:
-                ok = self.converter_obj.exec_with_progress(params, on_line=self.update_status_line)
+        threading.Thread(target=self._download_worker, args=(params,), daemon=True).start()
 
-            except Exception as error:
-                self._status_queue.put(('done', (False, str(error))))
+    def _download_worker(self, params: list) -> None:
+        # выполняется в фоновом потоке: виджеты не трогает, только кладёт сообщения в очередь
+        try:
+            ok = self.converter_obj.exec_with_progress(params, on_line=self.update_status_line)
 
-                return
+        except Exception as error:
+            self._status_queue.put(('done', (False, str(error))))
 
-            self._status_queue.put(('done', (ok, 'Ошибка скачивания')))
+            return
 
-        threading.Thread(target=worker, daemon=True).start()
+        self._status_queue.put(('done', (ok, 'Ошибка скачивания')))
 
     @validate_call
-    def download_archive(self, height: int = 720, convert_to_mp4: bool = False):
+    def download_archive(self, height: int = 720, convert_to_mp4: bool = False) -> None:
         self.status = 'Старт'
 
         # self.update_yt_dlp()
@@ -1280,10 +1264,8 @@ class Youtube:
 
         self.status = 'Ок'
 
-    def create_link(self):
+    def create_link(self) -> None:
         initial_dir = DOWNLOAD_DIR
-
-        len_initial_dir_parts = len(initial_dir.parts)
 
         if source := fd.askopenfilename(initialdir=initial_dir, title='Источник для ссылки'):
 
@@ -1303,7 +1285,7 @@ class Youtube:
 
         pass
 
-    def exec_button(self, size_video, convert_to_mp4: bool = False):
+    def exec_button(self, size_video: tkinter.StringVar, convert_to_mp4: bool = False) -> None:
 
         self.status = 'Статус'
 
@@ -1343,7 +1325,7 @@ class Youtube:
             raise ValueError('Не найдено значение для меню')
 
     @validate_call
-    def download_any(self, height: int | str | None = None):
+    def download_any(self, height: int | str | None = None) -> None:
 
         self.status = 'Старт'
 
@@ -1380,7 +1362,13 @@ class Youtube:
 
         self._run_download_in_thread(params)
 
-    def convert_to_telegram(self, tune: str, height: int | str | None = None, start_time: str = '00:00:00', end_time: str | None = None):
+    def convert_to_telegram(
+            self,
+            tune: str,
+            height: int | str | None = None,
+            start_time: str = '00:00:00',
+            end_time: str | None = None
+    ) -> None:
 
         self.status = 'Старт'
 
@@ -1415,27 +1403,33 @@ class Youtube:
 
         preset = self.converter_obj.PresetH264.veryslow
         tune = self.converter_obj.TuneH264[tune]
-        audio_bitrate_kilobit = 196
+        audio_bitrate_kilobit = 256
         crf = 24
+
+        # AAC копируется без перекодирования (без потерь); прочие кодеки (Opus и т. п.) перекодируются в AAC
+        track_audio = self.converter_obj.get_audio_media_info(file=file)
+        copy_audio = track_audio is not None and track_audio.format == 'AAC'
 
         self.converter_obj.h264(
             crf=crf,
             height=target_height,
             preset=preset,
             tune=tune,
+            copy_audio=copy_audio,
             audio_bitrate_kilobit=audio_bitrate_kilobit,
             file=file,
             first_frame_image=preview,
             start_time=start_time,
             end_time=end_time,
-            log_file='convert-to-telegram.log'
+            log_file='convert-to-telegram.log',
+            lookahead_threads=5
         )
 
         sound_ok()
 
         self.status = f'Ок ({time.monotonic() - start:.1f}s)'
 
-    def convert_fast(self):
+    def convert_fast(self) -> None:
         self.status = 'Старт'
 
         start = time.monotonic()
@@ -1474,7 +1468,7 @@ class Youtube:
 
         self.status = f'Ок ({time.monotonic() - start:.1f}s)'
 
-    def convert_to_mp3(self):
+    def convert_to_mp3(self) -> None:
         self.status = 'Старт'
 
         start = time.monotonic()
@@ -1485,7 +1479,7 @@ class Youtube:
 
         self.status = f'Ок ({time.monotonic() - start:.1f}s)'
 
-    def convert_to_vorbis(self):
+    def convert_to_vorbis(self) -> None:
         self.status = 'Старт'
 
         start = time.monotonic()
@@ -1496,7 +1490,7 @@ class Youtube:
 
         self.status = f'Ок ({time.monotonic() - start:.1f}s)'
 
-    def convert_to_flac(self):
+    def convert_to_flac(self) -> None:
         self.status = 'Старт'
 
         start = time.monotonic()
@@ -1507,7 +1501,7 @@ class Youtube:
 
         self.status = f'Ок ({time.monotonic() - start:.1f}s)'
 
-    def open_file_with_cache(self, start_dir: Path | str, cache_key: str):
+    def open_file_with_cache(self, start_dir: Path | str, cache_key: str) -> Path:
 
         start_dir = Path(start_dir)
 
@@ -1533,7 +1527,7 @@ class Youtube:
         return file
 
     @validate_call
-    def download_audio(self):
+    def download_audio(self) -> None:
         self.status = 'Старт'
 
         url = self.tkinter_root.clipboard_get()
@@ -1570,7 +1564,7 @@ class Youtube:
     def update_status_line(self, line: str) -> None:
         self._status_queue.put(('status', line[:120]))
 
-    def sound_error(self):
+    def sound_error(self) -> None:
         self.status = 'Ошибка'
 
         winsound.Beep(500, 300)
@@ -1579,17 +1573,17 @@ class Youtube:
         winsound.Beep(500, 300)
 
     @property
-    def status(self):
+    def status(self) -> None:
         return None
 
     @status.setter
-    def status(self, status):
+    def status(self, status: str | None) -> None:
         self.label_status.config(text=status)
 
         self.label_status.update_idletasks()
 
 
-def sound_error():
+def sound_error() -> None:
 
     winsound.Beep(500, 300)
     time.sleep(0.05)
@@ -1597,11 +1591,11 @@ def sound_error():
     winsound.Beep(500, 300)
 
 
-def sound_ok():
+def sound_ok() -> None:
     winsound.Beep(500, 300)
 
 
-def filter_float(value: str):
+def filter_float(value: str) -> float:
     value2 = str(value).replace(',', '.')
 
     value3 = float(value2)
